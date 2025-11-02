@@ -1,0 +1,426 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table restaurants {
+  id String [pk]
+  name String [not null]
+  slug String [unique, not null]
+  address Json [not null]
+  contact Json [not null]
+  ownerId String [not null]
+  businessInfo Json [not null]
+  subscription Json [not null]
+  settings Json [not null]
+  status String [not null, default: 'active']
+  stats Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  owner users [not null]
+  businessUsers business_users [not null]
+  menuItems menu_items [not null]
+  orders orders [not null]
+  payments payments [not null]
+  tables tables [not null]
+  analyticsDailies analytics_daily [not null]
+  inventoryItems inventory_items [not null]
+  auditLogs audit_logs [not null]
+  expenseCategories expense_categories [not null]
+  expenses expenses [not null]
+}
+
+Table users {
+  id String [pk]
+  email String [unique, not null]
+  emailVerified Boolean [not null, default: false]
+  name String
+  image String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  ownedRestaurants restaurants [not null]
+  businessUsers business_users [not null]
+  orders orders [not null]
+  payments payments [not null]
+  auditLogs audit_logs [not null]
+  expensesCreated expenses [not null]
+  expensesApproved expenses [not null]
+  sessions session [not null]
+  accounts account [not null]
+}
+
+Table business_users {
+  id String [pk]
+  restaurantId String [not null]
+  userId String [not null]
+  role String [not null]
+  status String [not null, default: 'active']
+  permissions String[] [not null]
+  joinedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+  user users [not null]
+
+  indexes {
+    (restaurantId, userId) [unique]
+  }
+}
+
+Table menu_items {
+  id String [pk]
+  restaurantId String [not null]
+  categories Json [not null]
+  menuVersion Decimal [not null, default: 1]
+  lastPublished DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+}
+
+Table inventory_items {
+  id String [pk]
+  restaurantId String [not null]
+  name String [not null]
+  sku String [not null]
+  category String [not null]
+  currentStock Decimal [not null]
+  minimumStock Decimal [not null]
+  unit String [not null]
+  costPerUnit Decimal [not null]
+  totalValue Decimal [not null]
+  trackExpiry Boolean [not null, default: false]
+  expiryDate DateTime
+  transactions Json[] [not null]
+  status String [not null, default: 'in_stock']
+  isActive Boolean [not null, default: true]
+  linkedMenuItems Json[] [not null]
+  alerts Json[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+
+  indexes {
+    (restaurantId, sku) [unique]
+  }
+}
+
+Table orders {
+  id String [pk]
+  orderNumber String [unique, not null]
+  restaurantId String [not null]
+  tableId String
+  tableNumber String
+  staffId String [not null]
+  staffName String [not null]
+  orderType String [not null]
+  customerInfo Json [not null]
+  items Json [not null]
+  pricing Json [not null]
+  discountsApplied Json[] [not null]
+  paymentStatus String [not null, default: 'pending']
+  balanceDue Decimal [not null, default: 0]
+  status String [not null, default: 'active']
+  priority String [not null, default: 'normal']
+  estimatedCompletionTime DateTime
+  actualCompletionTime DateTime
+  feedback Json
+  timestamps Json [not null]
+  auditTrail Json[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+  table tables
+  staff users [not null]
+  payments payments [not null]
+}
+
+Table payments {
+  id String [pk]
+  restaurantId String [not null]
+  orderId String [not null]
+  orderNumber String [not null]
+  paymentNumber String [unique, not null]
+  amount Decimal [not null]
+  method String [not null]
+  status String [not null, default: 'pending']
+  gateway String
+  gatewayTransactionId String
+  gatewayOrderId String
+  gatewayResponse Json
+  customerInfo Json [not null]
+  billingAddress Json
+  taxDetails Json [not null]
+  refunds Json[] [not null]
+  receipt Json
+  processedBy String
+  processedAt DateTime
+  settlementInfo Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+  order orders [not null]
+  processor users
+}
+
+Table tables {
+  id String [pk]
+  restaurantId String [not null]
+  tableNumber String [not null]
+  displayName String [not null]
+  capacity Int [not null]
+  position Json [not null]
+  shape String [not null, default: 'square']
+  dimensions Json
+  status String [not null, default: 'available']
+  qrCode Json
+  currentSession Json
+  reservations Json[] [not null]
+  settings Json [not null]
+  maintenanceLog Json[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+  orders orders [not null]
+
+  indexes {
+    (restaurantId, tableNumber) [unique]
+  }
+}
+
+Table analytics_daily {
+  id String [pk]
+  restaurantId String [not null]
+  date DateTime [not null]
+  salesSummary Json [not null]
+  paymentMethods Json [not null]
+  topItems Json[] [not null]
+  hourlyBreakdown Json[] [not null]
+  staffPerformance Json[] [not null]
+  tablePerformance Json[] [not null]
+  customerInsights Json [not null]
+  inventoryConsumed Json[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  restaurant restaurants [not null]
+
+  indexes {
+    (restaurantId, date) [unique]
+  }
+}
+
+Table expense_categories {
+  id String [pk]
+  restaurantId String [not null]
+  name String [not null]
+  description String
+  color String [not null]
+  icon String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+  expenses expenses [not null]
+}
+
+Table expenses {
+  id String [pk]
+  restaurantId String [not null]
+  categoryId String [not null]
+  title String [not null]
+  description String
+  amount Decimal [not null]
+  currency String [not null, default: 'INR']
+  expenseDate DateTime [not null]
+  paymentMethod String [not null]
+  vendorName String
+  vendorContact String
+  receiptUrl String
+  receiptNumber String
+  taxAmount Decimal
+  taxPercentage Decimal
+  isRecurring Boolean [not null, default: false]
+  recurringFrequency String
+  recurringEndDate DateTime
+  tags String[] [not null]
+  status String [not null, default: 'pending']
+  approvedBy String
+  approvedAt DateTime
+  notes String
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+  category expense_categories [not null]
+  creator users [not null]
+  approver users
+}
+
+Table audit_logs {
+  id String [pk]
+  restaurantId String [not null]
+  userId String
+  action String [not null]
+  resource String [not null]
+  resourceId String
+  details Json
+  ipAddress String
+  userAgent String
+  createdAt DateTime [default: `now()`, not null]
+  restaurant restaurants [not null]
+  user users
+}
+
+Table session {
+  id String [pk]
+  expiresAt DateTime [not null]
+  token String [unique, not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  ipAddress String
+  userAgent String
+  userId String [not null]
+  user users [not null]
+}
+
+Table account {
+  id String [pk]
+  accountId String [not null]
+  providerId String [not null]
+  userId String [not null]
+  user users [not null]
+  accessToken String
+  refreshToken String
+  idToken String
+  accessTokenExpiresAt DateTime
+  refreshTokenExpiresAt DateTime
+  scope String
+  password String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table verification {
+  id String [pk]
+  identifier String [not null]
+  value String [not null]
+  expiresAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [default: `now()`, not null]
+}
+
+Enum UserRole {
+  OWNER
+  MANAGER
+  STAFF
+  VIEWER
+  ACCOUNTANT
+}
+
+Enum RestaurantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+Enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+  ONLINE
+}
+
+Enum OrderStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+Enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+Enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  NET_BANKING
+  WALLET
+  BANK_TRANSFER
+  OTHER
+}
+
+Enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+Enum InventoryStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  DISCONTINUED
+}
+
+Enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+Enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+Ref: restaurants.ownerId > users.id [delete: Cascade]
+
+Ref: business_users.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: business_users.userId > users.id [delete: Cascade]
+
+Ref: menu_items.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: inventory_items.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: orders.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: orders.tableId > tables.id [delete: Set Null]
+
+Ref: orders.staffId > users.id [delete: Restrict]
+
+Ref: payments.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: payments.orderId > orders.id [delete: Cascade]
+
+Ref: payments.processedBy > users.id [delete: Set Null]
+
+Ref: tables.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: analytics_daily.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: expense_categories.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: expenses.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: expenses.categoryId > expense_categories.id [delete: Restrict]
+
+Ref: expenses.createdBy > users.id [delete: Restrict]
+
+Ref: expenses.approvedBy > users.id [delete: Restrict]
+
+Ref: audit_logs.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: audit_logs.userId > users.id [delete: Set Null]
+
+Ref: session.userId > users.id [delete: Cascade]
+
+Ref: account.userId > users.id [delete: Cascade]
