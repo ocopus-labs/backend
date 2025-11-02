@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: nestjs-prod-app
+    container_name: nestjs_app_prod
+
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
