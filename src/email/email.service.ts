@@ -86,7 +86,7 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(to: string, resetToken: string, name: string): Promise<boolean> {
-    const resetUrl = `${process.env.AUTH_BASE_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
     
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
