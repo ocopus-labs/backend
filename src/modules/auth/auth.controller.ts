@@ -26,7 +26,7 @@ interface UserSession {
   token?: string;
 }
 
-@Controller('auth')
+@Controller('users')
 @UsePipes(new ValidationPipe({ transform: true }))
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
