@@ -50,12 +50,10 @@ model User {
   emailVerified    Boolean        @default(false) @map("email_verified")
   name             String?
   image            String?
+  role             String?        // For Better Auth admin plugin
+  banned           Boolean?       // For Better Auth admin plugin
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
-  role             String?
-  banned           Boolean?       @default(false)
-  banReason        String?
-  banExpires       DateTime?
   accounts         Account[]
   auditLogs        AuditLog[]
   businessUsers    BusinessUser[]

@@ -35,12 +35,10 @@ Table users {
   emailVerified Boolean [not null, default: false]
   name String
   image String
+  role String
+  banned Boolean
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-  role String
-  banned Boolean [default: false]
-  banReason String
-  banExpires DateTime
   accounts account [not null]
   auditLogs audit_logs [not null]
   businessUsers business_users [not null]

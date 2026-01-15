@@ -1,5 +1,5 @@
 // Auth helpers and utilities
-export { auth, setMailService } from './auth.config';
+export { createAuthConfig } from './auth.config';
 export {
   USER_ROLES,
   PERMISSIONS,

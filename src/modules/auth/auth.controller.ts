@@ -3,16 +3,23 @@ import {
   Post,
   Get,
   Body,
-  UseGuards,
   Param,
   Query,
   HttpCode,
   HttpStatus,
   Logger,
+  ParseIntPipe,
+  InternalServerErrorException,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { Session, Roles } from '@thallesp/nestjs-better-auth';
 import { AuthService, UserWithRole } from './auth.service';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
+import { UpdateRoleDto } from './dto/update-role.dto';
+import { PermissionDto } from './dto/grant-permission.dto';
+import { BanUserDto } from './dto/ban-user.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 
 interface UserSession {
   user: UserWithRole;
@@ -20,10 +27,11 @@ interface UserSession {
 }
 
 @Controller('auth')
+@UsePipes(new ValidationPipe({ transform: true }))
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   /**
    * Get current user profile
@@ -35,7 +43,7 @@ export class AuthController {
       return { user };
     } catch (error) {
       this.logger.error('Error getting profile:', error);
-      throw error;
+      throw new InternalServerErrorException('Failed to get profile');
     }
   }
 
@@ -45,18 +53,15 @@ export class AuthController {
   @Get('users')
   @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER])
   async listUsers(
-    @Query('limit') limit: string = '50',
-    @Query('offset') offset: string = '0',
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
+    @Query('offset', new ParseIntPipe({ optional: true })) offset: number = 0,
   ) {
     try {
-      const result = await this.authService.listUsers(
-        parseInt(limit),
-        parseInt(offset),
-      );
+      const result = await this.authService.listUsers(limit, offset);
       return result;
     } catch (error) {
       this.logger.error('Error listing users:', error);
-      throw error;
+      throw new InternalServerErrorException('Failed to list users');
     }
   }
 
@@ -74,7 +79,7 @@ export class AuthController {
       return { user };
     } catch (error) {
       this.logger.error('Error getting user:', error);
-      throw error;
+      throw new InternalServerErrorException('Failed to get user');
     }
   }
 
@@ -86,7 +91,7 @@ export class AuthController {
   @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER])
   async updateUserRole(
     @Param('userId') userId: string,
-    @Body() body: { restaurantId: string; role: string },
+    @Body() body: UpdateRoleDto,
   ) {
     try {
       await this.authService.updateUserRole(
@@ -109,7 +114,7 @@ export class AuthController {
   @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER])
   async grantPermission(
     @Param('userId') userId: string,
-    @Body() body: { restaurantId: string; permission: string },
+    @Body() body: PermissionDto,
   ) {
     try {
       await this.authService.grantPermission(
@@ -132,7 +137,7 @@ export class AuthController {
   @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER])
   async revokePermission(
     @Param('userId') userId: string,
-    @Body() body: { restaurantId: string; permission: string },
+    @Body() body: PermissionDto,
   ) {
     try {
       await this.authService.revokePermission(
@@ -155,10 +160,10 @@ export class AuthController {
   @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER])
   async banUser(
     @Param('userId') userId: string,
-    @Body() body?: { reason?: string; expiresIn?: number },
+    @Body() body: BanUserDto,
   ) {
     try {
-      await this.authService.banUser(userId, body?.reason, body?.expiresIn);
+      await this.authService.banUser(userId, body.reason, body.expiresIn);
       return { message: 'User banned successfully' };
     } catch (error) {
       this.logger.error('Error banning user:', error);
@@ -188,7 +193,7 @@ export class AuthController {
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER])
-  async verifyEmail(@Body() body: { userId: string }) {
+  async verifyEmail(@Body() body: VerifyEmailDto) {
     try {
       await this.authService.verifyEmail(body.userId);
       return { message: 'Email verified successfully' };
@@ -216,7 +221,7 @@ export class AuthController {
       return { hasPermission };
     } catch (error) {
       this.logger.error('Error checking permission:', error);
-      throw error;
+      throw new InternalServerErrorException('Failed to check permission');
     }
   }
 }

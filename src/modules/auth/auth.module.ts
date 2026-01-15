@@ -1,34 +1,27 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AuthModule as NestJSBetterAuthModule } from '@thallesp/nestjs-better-auth';
-import { auth, setMailService } from '../../lib/auth/auth.config';
+import { createAuthConfig } from '../../lib/auth/auth.config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { MailModule } from '../mail/mail.module';
 import { MailService } from '../mail/mail.service';
+import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [
-    NestJSBetterAuthModule.forRoot({
-      auth,
-      // Global AuthGuard is enabled by default
-      // All routes are protected unless marked with @AllowAnonymous() or @OptionalAuth()
-      disableGlobalAuthGuard: false,
-      // Optionally disable automatic CORS for trusted origins
-      // disableTrustedOriginsCors: false,
-      // Optionally disable automatic body parser
-      // disableBodyParser: false,
-    }),
+    PrismaModule,
     MailModule,
+    NestJSBetterAuthModule.forRootAsync({
+      imports: [PrismaModule, MailModule],
+      useFactory: (prisma: PrismaService, mailService: MailService) => ({
+        auth: createAuthConfig(prisma, mailService),
+      }),
+      inject: [PrismaService, MailService],
+    }),
   ],
   controllers: [AuthController],
   providers: [AuthService],
   exports: [AuthService],
 })
-export class AuthModule implements OnModuleInit {
-  constructor(private mailService: MailService) {}
-
-  onModuleInit() {
-    // Inject mail service into auth configuration
-    setMailService(this.mailService);
-  }
-}
+export class AuthModule { }
