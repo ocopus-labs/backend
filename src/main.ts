@@ -5,7 +5,17 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Disable body parser for Better Auth
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false,
+  });
+
+  // Enable CORS for frontend
+  app.enableCors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true,
+  });
+
   await app
     .listen(process.env.PORT ?? 3000)
     .then(() =>

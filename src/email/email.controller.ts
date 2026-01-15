@@ -58,9 +58,10 @@ export class EmailController {
   }
 
   @Post('test')
-  async testEmail() {
+  async testEmail(@Body() body: { to?: string }) {
+    const to = body?.to || process.env.EMAIL_USER || 'test@example.com';
     const result = await this.emailService.sendEmail({
-      to: 'test@example.com',
+      to,
       subject: 'Test Email from Billing System',
       html: `
         <h2>Test Email</h2>
@@ -71,7 +72,7 @@ export class EmailController {
 
     return {
       success: result,
-      message: result ? 'Test email sent successfully' : 'Failed to send test email',
+      message: result ? `Test email sent successfully to ${to}` : `Failed to send test email to ${to}`,
     };
   }
 }

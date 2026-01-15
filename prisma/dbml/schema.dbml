@@ -16,17 +16,17 @@ Table restaurants {
   stats Json
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-  owner users [not null]
+  analyticsDailies analytics_daily [not null]
+  auditLogs audit_logs [not null]
   businessUsers business_users [not null]
+  expenseCategories expense_categories [not null]
+  expenses expenses [not null]
+  inventoryItems inventory_items [not null]
   menuItems menu_items [not null]
   orders orders [not null]
   payments payments [not null]
+  owner users [not null]
   tables tables [not null]
-  analyticsDailies analytics_daily [not null]
-  inventoryItems inventory_items [not null]
-  auditLogs audit_logs [not null]
-  expenseCategories expense_categories [not null]
-  expenses expenses [not null]
 }
 
 Table users {
@@ -35,17 +35,19 @@ Table users {
   emailVerified Boolean [not null, default: false]
   name String
   image String
+  role String
+  banned Boolean
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-  ownedRestaurants restaurants [not null]
+  accounts account [not null]
+  auditLogs audit_logs [not null]
   businessUsers business_users [not null]
+  expensesApproved expenses [not null]
+  expensesCreated expenses [not null]
   orders orders [not null]
   payments payments [not null]
-  auditLogs audit_logs [not null]
-  expensesCreated expenses [not null]
-  expensesApproved expenses [not null]
+  ownedRestaurants restaurants [not null]
   sessions session [not null]
-  accounts account [not null]
 }
 
 Table business_users {
@@ -129,8 +131,8 @@ Table orders {
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   restaurant restaurants [not null]
-  table tables
   staff users [not null]
+  table tables
   payments payments [not null]
 }
 
@@ -157,9 +159,9 @@ Table payments {
   settlementInfo Json
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-  restaurant restaurants [not null]
   order orders [not null]
   processor users
+  restaurant restaurants [not null]
 }
 
 Table tables {
@@ -179,8 +181,8 @@ Table tables {
   maintenanceLog Json[] [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-  restaurant restaurants [not null]
   orders orders [not null]
+  restaurant restaurants [not null]
 
   indexes {
     (restaurantId, tableNumber) [unique]
@@ -248,10 +250,10 @@ Table expenses {
   createdBy String [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-  restaurant restaurants [not null]
+  approver users
   category expense_categories [not null]
   creator users [not null]
-  approver users
+  restaurant restaurants [not null]
 }
 
 Table audit_logs {
@@ -286,7 +288,6 @@ Table account {
   accountId String [not null]
   providerId String [not null]
   userId String [not null]
-  user users [not null]
   accessToken String
   refreshToken String
   idToken String
@@ -296,6 +297,7 @@ Table account {
   password String
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
+  user users [not null]
 }
 
 Table verification {
@@ -393,15 +395,15 @@ Ref: inventory_items.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: orders.restaurantId > restaurants.id [delete: Cascade]
 
-Ref: orders.tableId > tables.id [delete: Set Null]
+Ref: orders.staffId > users.id
 
-Ref: orders.staffId > users.id [delete: Restrict]
-
-Ref: payments.restaurantId > restaurants.id [delete: Cascade]
+Ref: orders.tableId > tables.id
 
 Ref: payments.orderId > orders.id [delete: Cascade]
 
-Ref: payments.processedBy > users.id [delete: Set Null]
+Ref: payments.processedBy > users.id
+
+Ref: payments.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: tables.restaurantId > restaurants.id [delete: Cascade]
 
@@ -409,17 +411,17 @@ Ref: analytics_daily.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: expense_categories.restaurantId > restaurants.id [delete: Cascade]
 
+Ref: expenses.approvedBy > users.id
+
+Ref: expenses.categoryId > expense_categories.id
+
+Ref: expenses.createdBy > users.id
+
 Ref: expenses.restaurantId > restaurants.id [delete: Cascade]
-
-Ref: expenses.categoryId > expense_categories.id [delete: Restrict]
-
-Ref: expenses.createdBy > users.id [delete: Restrict]
-
-Ref: expenses.approvedBy > users.id [delete: Restrict]
 
 Ref: audit_logs.restaurantId > restaurants.id [delete: Cascade]
 
-Ref: audit_logs.userId > users.id [delete: Set Null]
+Ref: audit_logs.userId > users.id
 
 Ref: session.userId > users.id [delete: Cascade]
 
