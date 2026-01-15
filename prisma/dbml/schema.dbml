@@ -6,6 +6,9 @@ Table restaurants {
   id String [pk]
   name String [not null]
   slug String [unique, not null]
+  type String [not null, default: 'restaurant']
+  logo String
+  description String
   address Json [not null]
   contact Json [not null]
   ownerId String [not null]

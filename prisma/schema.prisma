@@ -15,6 +15,9 @@ model Restaurant {
   id                String            @id @default(uuid())
   name              String
   slug              String            @unique
+  type              String            @default("restaurant") // Business type: restaurant, salon, gym, cafe, retail, etc.
+  logo              String?           // Cloudinary URL for business logo
+  description       String?           // Business description
   address           Json
   contact           Json
   ownerId           String            @map("owner_id")
@@ -39,6 +42,7 @@ model Restaurant {
 
   @@index([ownerId])
   @@index([slug])
+  @@index([type])
   @@index([status])
   @@index([createdAt])
   @@map("restaurants")
