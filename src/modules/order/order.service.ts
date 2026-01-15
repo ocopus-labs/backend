@@ -1,0 +1,908 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from 'src/modules/prisma/prisma.service';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  CreateOrderDto,
+  UpdateOrderStatusDto,
+  AddItemsToOrderDto,
+  UpdateItemQuantityDto,
+  ApplyDiscountDto,
+} from './dto';
+import type {
+  OrderItem,
+  OrderPricing,
+  OrderTimestamps,
+  OrderDiscount,
+  OrderAuditEntry,
+} from './interfaces';
+
+@Injectable()
+export class OrderService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private generateOrderNumber(): string {
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `ORD-${timestamp}-${random}`;
+  }
+
+  private calculateItemTotal(item: CreateOrderDto['items'][0]): number {
+    let total = item.basePrice * item.quantity;
+
+    if (item.modifiers) {
+      if (item.modifiers.size) {
+        total += item.modifiers.size.price * item.quantity;
+      }
+      if (item.modifiers.spiceLevel) {
+        total += item.modifiers.spiceLevel.price * item.quantity;
+      }
+      if (item.modifiers.addOns) {
+        for (const addOn of item.modifiers.addOns) {
+          total += addOn.price * item.quantity;
+        }
+      }
+    }
+
+    return total;
+  }
+
+  private calculatePricing(
+    items: OrderItem[],
+    taxRate: number = 0,
+    discount?: { type: 'percentage' | 'fixed'; value: number },
+    serviceCharge: number = 0,
+  ): OrderPricing {
+    const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+    const taxAmount = (subtotal * taxRate) / 100;
+
+    let discountAmount = 0;
+    if (discount) {
+      discountAmount =
+        discount.type === 'percentage'
+          ? (subtotal * discount.value) / 100
+          : discount.value;
+    }
+
+    const total = subtotal + taxAmount - discountAmount + serviceCharge;
+
+    return {
+      subtotal,
+      taxRate,
+      taxAmount,
+      discountType: discount?.type,
+      discountValue: discount?.value,
+      discountAmount,
+      serviceCharge,
+      total,
+    };
+  }
+
+  async createOrder(
+    businessId: string,
+    staffId: string,
+    staffName: string,
+    dto: CreateOrderDto,
+  ) {
+    const orderNumber = this.generateOrderNumber();
+    const now = new Date().toISOString();
+
+    // Transform items with calculated totals
+    const orderItems: OrderItem[] = dto.items.map((item) => ({
+      id: uuidv4(),
+      menuItemId: item.menuItemId,
+      name: item.name,
+      quantity: item.quantity,
+      basePrice: item.basePrice,
+      totalPrice: this.calculateItemTotal(item),
+      modifiers: item.modifiers,
+      status: 'pending' as const,
+    }));
+
+    // Calculate pricing
+    const pricing = this.calculatePricing(
+      orderItems,
+      dto.taxRate,
+      dto.discount,
+      dto.serviceCharge,
+    );
+
+    // Build timestamps
+    const timestamps: OrderTimestamps = {
+      placedAt: now,
+    };
+
+    // Build discounts array
+    const discountsApplied: OrderDiscount[] = [];
+    if (dto.discount) {
+      discountsApplied.push({
+        id: uuidv4(),
+        code: dto.discount.code,
+        type: dto.discount.type,
+        value: dto.discount.value,
+        amount: pricing.discountAmount,
+        reason: dto.discount.reason,
+      });
+    }
+
+    // Initial audit trail
+    const auditTrail: OrderAuditEntry[] = [
+      {
+        action: 'order_created',
+        performedBy: staffId,
+        performedAt: now,
+        details: { orderType: dto.orderType, itemCount: orderItems.length },
+      },
+    ];
+
+    // Calculate estimated completion time
+    let estimatedCompletionTime: Date | null = null;
+    if (dto.estimatedMinutes) {
+      estimatedCompletionTime = new Date(Date.now() + dto.estimatedMinutes * 60000);
+    }
+
+    const order = await this.prisma.order.create({
+      data: {
+        orderNumber,
+        restaurantId: businessId,
+        tableId: dto.tableId || null,
+        tableNumber: dto.tableNumber || null,
+        staffId,
+        staffName,
+        orderType: dto.orderType,
+        customerInfo: (dto.customerInfo || {}) as object,
+        items: orderItems as unknown as object[],
+        pricing: pricing as unknown as object,
+        discountsApplied: discountsApplied as unknown as object[],
+        paymentStatus: 'pending',
+        balanceDue: pricing.total,
+        status: 'active',
+        priority: dto.priority || 'normal',
+        estimatedCompletionTime,
+        timestamps: timestamps as unknown as object,
+        auditTrail: auditTrail as unknown as object[],
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    // Create audit log
+    await this.prisma.auditLog.create({
+      data: {
+        restaurantId: businessId,
+        userId: staffId,
+        action: 'order.create',
+        resource: 'order',
+        resourceId: order.id,
+        details: {
+          orderNumber,
+          orderType: dto.orderType,
+          itemCount: orderItems.length,
+          total: pricing.total,
+        } as object,
+      },
+    });
+
+    return { message: 'Order created successfully', order };
+  }
+
+  async getOrders(
+    businessId: string,
+    options?: {
+      status?: string;
+      paymentStatus?: string;
+      orderType?: string;
+      fromDate?: Date;
+      toDate?: Date;
+      limit?: number;
+      offset?: number;
+    },
+  ) {
+    const where: Record<string, unknown> = { restaurantId: businessId };
+
+    if (options?.status) {
+      where.status = options.status;
+    }
+    if (options?.paymentStatus) {
+      where.paymentStatus = options.paymentStatus;
+    }
+    if (options?.orderType) {
+      where.orderType = options.orderType;
+    }
+    if (options?.fromDate || options?.toDate) {
+      where.createdAt = {};
+      if (options?.fromDate) {
+        (where.createdAt as Record<string, Date>).gte = options.fromDate;
+      }
+      if (options?.toDate) {
+        (where.createdAt as Record<string, Date>).lte = options.toDate;
+      }
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: options?.limit || 50,
+        skip: options?.offset || 0,
+        include: {
+          table: true,
+          staff: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return { orders, total };
+  }
+
+  async getOrderById(businessId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId },
+      include: {
+        table: true,
+        staff: {
+          select: { id: true, name: true, email: true },
+        },
+        payments: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return { order };
+  }
+
+  async getOrderByNumber(businessId: string, orderNumber: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { orderNumber, restaurantId: businessId },
+      include: {
+        table: true,
+        staff: {
+          select: { id: true, name: true, email: true },
+        },
+        payments: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return { order };
+  }
+
+  async getActiveOrders(businessId: string) {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        restaurantId: businessId,
+        status: 'active',
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        table: true,
+        staff: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    return { orders };
+  }
+
+  async updateOrderStatus(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    dto: UpdateOrderStatusDto,
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status === dto.status) {
+      throw new BadRequestException(`Order is already ${dto.status}`);
+    }
+
+    const now = new Date().toISOString();
+    const timestamps = existing.timestamps as unknown as OrderTimestamps;
+    const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
+
+    // Update timestamps based on status
+    if (dto.status === 'completed') {
+      timestamps.completedAt = now;
+    } else if (dto.status === 'cancelled') {
+      timestamps.cancelledAt = now;
+    }
+
+    // Add audit entry
+    auditTrail.push({
+      action: `status_changed_to_${dto.status}`,
+      performedBy: staffId,
+      performedAt: now,
+      details: { reason: dto.reason, previousStatus: existing.status },
+    });
+
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: dto.status,
+        timestamps: timestamps as unknown as object,
+        auditTrail: auditTrail as unknown as object[],
+        actualCompletionTime: dto.status === 'completed' ? new Date() : undefined,
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    // Create audit log
+    await this.prisma.auditLog.create({
+      data: {
+        restaurantId: businessId,
+        userId: staffId,
+        action: `order.${dto.status}`,
+        resource: 'order',
+        resourceId: order.id,
+        details: { orderNumber: order.orderNumber, reason: dto.reason } as object,
+      },
+    });
+
+    return { message: `Order ${dto.status}`, order };
+  }
+
+  async addItemsToOrder(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    dto: AddItemsToOrderDto,
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status !== 'active') {
+      throw new BadRequestException('Cannot modify a non-active order');
+    }
+
+    const now = new Date().toISOString();
+    const existingItems = existing.items as unknown as OrderItem[];
+    const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
+
+    // Create new items
+    const newItems: OrderItem[] = dto.items.map((item) => ({
+      id: uuidv4(),
+      menuItemId: item.menuItemId,
+      name: item.name,
+      quantity: item.quantity,
+      basePrice: item.basePrice,
+      totalPrice: this.calculateItemTotal(item),
+      modifiers: item.modifiers,
+      status: 'pending' as const,
+    }));
+
+    const allItems = [...existingItems, ...newItems];
+
+    // Recalculate pricing
+    const existingPricing = existing.pricing as unknown as OrderPricing;
+    const pricing = this.calculatePricing(
+      allItems,
+      existingPricing.taxRate,
+      existingPricing.discountType
+        ? { type: existingPricing.discountType, value: existingPricing.discountValue! }
+        : undefined,
+      existingPricing.serviceCharge,
+    );
+
+    // Add audit entry
+    auditTrail.push({
+      action: 'items_added',
+      performedBy: staffId,
+      performedAt: now,
+      details: { itemsAdded: newItems.length, newItemNames: newItems.map((i) => i.name) },
+    });
+
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        items: allItems as unknown as object[],
+        pricing: pricing as unknown as object,
+        balanceDue: pricing.total - Number(existing.balanceDue) + Number(existing.balanceDue),
+        auditTrail: auditTrail as unknown as object[],
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    return { message: 'Items added to order', order };
+  }
+
+  async updateItemQuantity(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    dto: UpdateItemQuantityDto,
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status !== 'active') {
+      throw new BadRequestException('Cannot modify a non-active order');
+    }
+
+    const items = existing.items as unknown as OrderItem[];
+    const itemIndex = items.findIndex((i) => i.id === dto.itemId);
+
+    if (itemIndex === -1) {
+      throw new NotFoundException('Item not found in order');
+    }
+
+    const now = new Date().toISOString();
+    const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
+
+    // Update quantity and recalculate total
+    const item = items[itemIndex];
+    const oldQuantity = item.quantity;
+    item.quantity = dto.quantity;
+    item.totalPrice = (item.totalPrice / oldQuantity) * dto.quantity;
+
+    // Recalculate pricing
+    const existingPricing = existing.pricing as unknown as OrderPricing;
+    const pricing = this.calculatePricing(
+      items,
+      existingPricing.taxRate,
+      existingPricing.discountType
+        ? { type: existingPricing.discountType, value: existingPricing.discountValue! }
+        : undefined,
+      existingPricing.serviceCharge,
+    );
+
+    // Add audit entry
+    auditTrail.push({
+      action: 'item_quantity_updated',
+      performedBy: staffId,
+      performedAt: now,
+      details: { itemId: dto.itemId, oldQuantity, newQuantity: dto.quantity },
+    });
+
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        items: items as unknown as object[],
+        pricing: pricing as unknown as object,
+        balanceDue: pricing.total,
+        auditTrail: auditTrail as unknown as object[],
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    return { message: 'Item quantity updated', order };
+  }
+
+  async updateItemStatus(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    itemId: string,
+    status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled',
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status !== 'active') {
+      throw new BadRequestException('Cannot modify a non-active order');
+    }
+
+    const items = existing.items as unknown as OrderItem[];
+    const itemIndex = items.findIndex((i) => i.id === itemId);
+
+    if (itemIndex === -1) {
+      throw new NotFoundException('Item not found in order');
+    }
+
+    const now = new Date().toISOString();
+    const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
+
+    // Update item status
+    const oldStatus = items[itemIndex].status;
+    items[itemIndex].status = status;
+
+    // Add audit entry
+    auditTrail.push({
+      action: 'item_status_updated',
+      performedBy: staffId,
+      performedAt: now,
+      details: { itemId, oldStatus, newStatus: status },
+    });
+
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        items: items as unknown as object[],
+        auditTrail: auditTrail as unknown as object[],
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    return { message: 'Item status updated', order };
+  }
+
+  async removeItemFromOrder(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    itemId: string,
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status !== 'active') {
+      throw new BadRequestException('Cannot modify a non-active order');
+    }
+
+    const items = existing.items as unknown as OrderItem[];
+    const itemToRemove = items.find((i) => i.id === itemId);
+
+    if (!itemToRemove) {
+      throw new NotFoundException('Item not found in order');
+    }
+
+    const now = new Date().toISOString();
+    const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
+
+    const filteredItems = items.filter((i) => i.id !== itemId);
+
+    if (filteredItems.length === 0) {
+      throw new BadRequestException('Cannot remove the last item. Cancel the order instead.');
+    }
+
+    // Recalculate pricing
+    const existingPricing = existing.pricing as unknown as OrderPricing;
+    const pricing = this.calculatePricing(
+      filteredItems,
+      existingPricing.taxRate,
+      existingPricing.discountType
+        ? { type: existingPricing.discountType, value: existingPricing.discountValue! }
+        : undefined,
+      existingPricing.serviceCharge,
+    );
+
+    // Add audit entry
+    auditTrail.push({
+      action: 'item_removed',
+      performedBy: staffId,
+      performedAt: now,
+      details: { itemId, itemName: itemToRemove.name },
+    });
+
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        items: filteredItems as unknown as object[],
+        pricing: pricing as unknown as object,
+        balanceDue: pricing.total,
+        auditTrail: auditTrail as unknown as object[],
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    return { message: 'Item removed from order', order };
+  }
+
+  async applyDiscount(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    dto: ApplyDiscountDto,
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status !== 'active') {
+      throw new BadRequestException('Cannot modify a non-active order');
+    }
+
+    const now = new Date().toISOString();
+    const items = existing.items as unknown as OrderItem[];
+    const existingPricing = existing.pricing as unknown as OrderPricing;
+    const discountsApplied = existing.discountsApplied as unknown as OrderDiscount[];
+    const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
+
+    // Calculate new pricing with discount
+    const pricing = this.calculatePricing(
+      items,
+      existingPricing.taxRate,
+      { type: dto.type, value: dto.value },
+      existingPricing.serviceCharge,
+    );
+
+    // Add to discounts array
+    discountsApplied.push({
+      id: uuidv4(),
+      code: dto.code,
+      type: dto.type,
+      value: dto.value,
+      amount: pricing.discountAmount,
+      reason: dto.reason,
+    });
+
+    // Add audit entry
+    auditTrail.push({
+      action: 'discount_applied',
+      performedBy: staffId,
+      performedAt: now,
+      details: { type: dto.type, value: dto.value, amount: pricing.discountAmount },
+    });
+
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        pricing: pricing as unknown as object,
+        discountsApplied: discountsApplied as unknown as object[],
+        balanceDue: pricing.total,
+        auditTrail: auditTrail as unknown as object[],
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    return { message: 'Discount applied', order };
+  }
+
+  async getOrdersByTable(businessId: string, tableId: string) {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        restaurantId: businessId,
+        tableId,
+        status: 'active',
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        staff: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    return { orders };
+  }
+
+  async getOrderStats(businessId: string, date?: Date) {
+    const startOfDay = date
+      ? new Date(date.setHours(0, 0, 0, 0))
+      : new Date(new Date().setHours(0, 0, 0, 0));
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    const [orders, completedOrders, cancelledOrders] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          restaurantId: businessId,
+          createdAt: { gte: startOfDay, lt: endOfDay },
+        },
+        select: {
+          status: true,
+          pricing: true,
+          paymentStatus: true,
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          restaurantId: businessId,
+          status: 'completed',
+          createdAt: { gte: startOfDay, lt: endOfDay },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          restaurantId: businessId,
+          status: 'cancelled',
+          createdAt: { gte: startOfDay, lt: endOfDay },
+        },
+      }),
+    ]);
+
+    const totalRevenue = orders
+      .filter((o) => o.status === 'completed' && o.paymentStatus === 'paid')
+      .reduce((sum, o) => {
+        const pricing = o.pricing as unknown as OrderPricing;
+        return sum + pricing.total;
+      }, 0);
+
+    const activeOrders = orders.filter((o) => o.status === 'active').length;
+
+    return {
+      stats: {
+        totalOrders: orders.length,
+        activeOrders,
+        completedOrders,
+        cancelledOrders,
+        totalRevenue,
+        averageOrderValue: completedOrders > 0 ? totalRevenue / completedOrders : 0,
+      },
+    };
+  }
+
+  async getTopSellingItems(businessId: string, limit: number = 5, days: number = 7) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        restaurantId: businessId,
+        status: 'completed',
+        createdAt: { gte: startDate },
+      },
+      select: {
+        items: true,
+      },
+    });
+
+    // Aggregate items sold
+    const itemStats = new Map<
+      string,
+      { name: string; category: string; quantitySold: number; revenue: number }
+    >();
+
+    for (const order of orders) {
+      const items = order.items as unknown as OrderItem[];
+      for (const item of items) {
+        const key = item.menuItemId;
+        const existing = itemStats.get(key);
+        if (existing) {
+          existing.quantitySold += item.quantity;
+          existing.revenue += item.totalPrice;
+        } else {
+          itemStats.set(key, {
+            name: item.name,
+            category: 'Menu Item', // Default category, could be enhanced with menu lookup
+            quantitySold: item.quantity,
+            revenue: item.totalPrice,
+          });
+        }
+      }
+    }
+
+    // Sort by quantity sold and take top items
+    const sortedItems = Array.from(itemStats.entries())
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => b.quantitySold - a.quantitySold)
+      .slice(0, limit);
+
+    return { items: sortedItems };
+  }
+
+  async getPeakHours(businessId: string, days: number = 7) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        restaurantId: businessId,
+        status: 'completed',
+        createdAt: { gte: startDate },
+      },
+      select: {
+        createdAt: true,
+        pricing: true,
+      },
+    });
+
+    // Aggregate by hour
+    const hourlyStats = new Map<number, { orderCount: number; revenue: number }>();
+
+    for (const order of orders) {
+      const hour = order.createdAt.getHours();
+      const pricing = order.pricing as unknown as OrderPricing;
+      const existing = hourlyStats.get(hour);
+      if (existing) {
+        existing.orderCount += 1;
+        existing.revenue += pricing.total;
+      } else {
+        hourlyStats.set(hour, { orderCount: 1, revenue: pricing.total });
+      }
+    }
+
+    // Format hours and sort by order count
+    const formatHour = (hour: number): string => {
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:00 ${period}`;
+    };
+
+    const peakHours = Array.from(hourlyStats.entries())
+      .map(([hour, data]) => ({
+        hour: formatHour(hour),
+        hourValue: hour,
+        ...data,
+      }))
+      .sort((a, b) => b.orderCount - a.orderCount)
+      .slice(0, 6);
+
+    return { hours: peakHours };
+  }
+
+  async getRevenueTrends(businessId: string, days: number = 30) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        restaurantId: businessId,
+        status: 'completed',
+        paymentStatus: 'paid',
+        createdAt: { gte: startDate },
+      },
+      select: {
+        createdAt: true,
+        pricing: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Aggregate by date
+    const dailyStats = new Map<string, { revenue: number; orders: number }>();
+
+    for (const order of orders) {
+      const dateKey = order.createdAt.toISOString().split('T')[0];
+      const pricing = order.pricing as unknown as OrderPricing;
+      const existing = dailyStats.get(dateKey);
+      if (existing) {
+        existing.revenue += pricing.total;
+        existing.orders += 1;
+      } else {
+        dailyStats.set(dateKey, { revenue: pricing.total, orders: 1 });
+      }
+    }
+
+    const trends = Array.from(dailyStats.entries()).map(([date, data]) => ({
+      date,
+      ...data,
+    }));
+
+    return { trends };
+  }
+}
