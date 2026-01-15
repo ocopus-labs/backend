@@ -10,6 +10,9 @@ async function bootstrap() {
     bodyParser: false,
   });
 
+  // Set global API prefix (exclude Better Auth routes which handle their own /api/auth path)
+  app.setGlobalPrefix('api');
+
   // Enable CORS for frontend
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',

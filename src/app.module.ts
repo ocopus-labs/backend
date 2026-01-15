@@ -5,6 +5,10 @@ import { AppService } from './app.service';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { MailModule } from './modules/mail/mail.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BusinessModule } from './modules/business/business.module';
+import { MenuModule } from './modules/menu/menu.module';
+import { OrderModule } from './modules/order/order.module';
+import { PaymentModule } from './modules/payment/payment.module';
 
 @Module({
   imports: [
@@ -16,6 +20,10 @@ import { AuthModule } from './modules/auth/auth.module';
     PrismaModule,
     MailModule,
     AuthModule,
+    BusinessModule,
+    MenuModule,
+    OrderModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
