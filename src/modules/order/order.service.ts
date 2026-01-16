@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -15,10 +15,16 @@ import type {
   OrderDiscount,
   OrderAuditEntry,
 } from './interfaces';
+import { OrderGateway } from './order.gateway';
+import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orderGateway: OrderGateway,
+    private readonly usageTrackingService: UsageTrackingService,
+  ) {}
 
   private generateOrderNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -83,6 +89,15 @@ export class OrderService {
     staffName: string,
     dto: CreateOrderDto,
   ) {
+    // Check subscription order limit
+    const limitCheck = await this.usageTrackingService.checkOrderLimit(businessId);
+    if (!limitCheck.allowed) {
+      throw new ForbiddenException(
+        limitCheck.message ||
+          `Monthly order limit reached (${limitCheck.current}/${limitCheck.limit}). Please upgrade your subscription.`,
+      );
+    }
+
     const orderNumber = this.generateOrderNumber();
     const now = new Date().toISOString();
 
@@ -182,6 +197,12 @@ export class OrderService {
         } as object,
       },
     });
+
+    // Increment order usage for subscription tracking
+    await this.usageTrackingService.incrementOrderUsage(businessId);
+
+    // Emit WebSocket event for real-time updates
+    this.orderGateway.emitOrderCreated(businessId, order);
 
     return { message: 'Order created successfully', order };
   }
@@ -355,6 +376,13 @@ export class OrderService {
         details: { orderNumber: order.orderNumber, reason: dto.reason } as object,
       },
     });
+
+    // Emit WebSocket event for real-time updates
+    if (dto.status === 'completed') {
+      this.orderGateway.emitOrderCompleted(businessId, orderId);
+    } else {
+      this.orderGateway.emitOrderUpdated(businessId, order);
+    }
 
     return { message: `Order ${dto.status}`, order };
   }
@@ -549,6 +577,14 @@ export class OrderService {
       include: {
         table: true,
       },
+    });
+
+    // Emit WebSocket event for real-time updates
+    this.orderGateway.emitItemStatusChanged(businessId, {
+      orderId,
+      itemId,
+      status,
+      order,
     });
 
     return { message: 'Item status updated', order };
