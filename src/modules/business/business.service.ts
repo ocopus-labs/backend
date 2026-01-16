@@ -10,6 +10,7 @@ import { CloudinaryService } from 'src/lib/common/upload';
 import { CreateBusinessDto, UpdateBusinessDto, UpdateBusinessSettingsDto } from './dto';
 import { USER_ROLES, getRolePermissions } from 'src/lib/auth/roles.constants';
 import { Business, BusinessWithUsers } from './interfaces';
+import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
 
 @Injectable()
 export class BusinessService {
@@ -18,9 +19,19 @@ export class BusinessService {
   constructor(
     private prisma: PrismaService,
     private cloudinaryService: CloudinaryService,
+    private usageTrackingService: UsageTrackingService,
   ) {}
 
   async create(dto: CreateBusinessDto, ownerId: string): Promise<Business> {
+    // Check subscription location limit
+    const limitCheck = await this.usageTrackingService.checkLocationLimit(ownerId);
+    if (!limitCheck.allowed) {
+      throw new ForbiddenException(
+        limitCheck.message ||
+          `Location limit reached (${limitCheck.current}/${limitCheck.limit}). Please upgrade your subscription.`,
+      );
+    }
+
     const slug = await this.generateSlug(dto.name);
 
     const business = await this.prisma.restaurant.create({
@@ -54,10 +65,6 @@ export class BusinessService {
           timezone: dto.settings.timezone,
           currency: dto.settings.currency,
           taxRate: dto.settings.taxRate || '0',
-        },
-        subscription: {
-          plan: 'trial',
-          status: 'active',
         },
         status: 'active',
       },
