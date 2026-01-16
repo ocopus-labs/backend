@@ -3,6 +3,23 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emailOTP, admin, openAPI } from 'better-auth/plugins';
 import { PrismaClient } from '@prisma/client';
 import type { MailService } from '../../modules/mail/mail.service';
+import {
+  dodopayments,
+  checkout,
+  portal,
+  webhooks,
+  usage,
+} from '@dodopayments/better-auth';
+import DodoPayments from 'dodopayments';
+
+// Initialize Dodo Payments client
+const dodoPaymentsClient = process.env.DODO_PAYMENTS_API_KEY
+  ? new DodoPayments({
+      bearerToken: process.env.DODO_PAYMENTS_API_KEY,
+      environment:
+        process.env.NODE_ENV === 'production' ? 'live_mode' : 'test_mode',
+    })
+  : null;
 
 export const createAuthConfig = (
   prisma: PrismaClient,
@@ -18,7 +35,7 @@ export const createAuthConfig = (
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: [
       process.env.AUTH_BASE_URL || 'http://localhost:3000',
-      'http://localhost:5173',
+      process.env.FRONTEND_URL || 'http://localhost:5173',
     ],
 
     database: prismaAdapter(prisma, {
@@ -90,14 +107,42 @@ export const createAuthConfig = (
 
       // Admin Plugin with custom roles
       admin({
-        defaultRole: 'staff',
-        adminRoles: ['super_admin', 'franchise_admin'],
+        defaultRole: 'user',
+        adminRoles: ['admin'],
         defaultBanReason: 'No reason provided',
         defaultBanExpiresIn: undefined, // Permanent ban by default
         bannedUserMessage:
           'Your account has been banned. Please contact support for assistance.',
         impersonationSessionDuration: 60 * 60 * 1, // 1 hour
       }),
+
+      // Dodo Payments Plugin (only if API key is configured)
+      ...(dodoPaymentsClient
+        ? [
+            dodopayments({
+              client: dodoPaymentsClient,
+              createCustomerOnSignUp: true,
+              use: [
+                checkout({
+                  products: [
+                    // Add your product IDs and slugs here
+                    // { productId: 'pdt_xxxxx', slug: 'premium-plan' },
+                  ],
+                  successUrl: '/dashboard/billing/success',
+                  authenticatedUsersOnly: true,
+                }),
+                portal(),
+                webhooks({
+                  webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET || '',
+                  onPayload: async (payload) => {
+                    console.log('Dodo Payments webhook:', payload.event_type);
+                  },
+                }),
+                usage(),
+              ],
+            }),
+          ]
+        : []),
     ],
 
     // Advanced features
