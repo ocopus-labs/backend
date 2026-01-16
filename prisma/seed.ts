@@ -3,6 +3,107 @@ import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
+// Subscription plan seed data
+async function seedSubscriptionPlans() {
+  console.log('🌱 Starting subscription plan seeding...');
+
+  const plans = [
+    {
+      name: 'FREE',
+      slug: 'free',
+      displayName: 'Free',
+      description: 'Get started with basic POS features',
+      priceMonthly: 0,
+      priceYearly: 0,
+      currency: 'INR',
+      dodoProductId: null, // Free plan doesn't need a Dodo product
+      maxLocations: 1,
+      maxTeamMembers: 2,
+      maxOrdersPerMonth: 100,
+      features: {
+        kitchenDisplay: false,
+        analytics: 'basic',
+        inventory: false,
+        expenses: false,
+        api: false,
+        whiteLabel: false,
+      },
+      isPublic: true,
+      sortOrder: 0,
+      status: 'active',
+    },
+    {
+      name: 'PRO',
+      slug: 'pro',
+      displayName: 'Pro',
+      description: 'For growing businesses with advanced needs',
+      priceMonthly: 2499,
+      priceYearly: 24990, // 2 months free
+      currency: 'INR',
+      dodoProductId: process.env.DODO_PRODUCT_PRO || null,
+      maxLocations: 5,
+      maxTeamMembers: 15,
+      maxOrdersPerMonth: -1, // unlimited
+      features: {
+        kitchenDisplay: true,
+        analytics: 'advanced',
+        inventory: true,
+        expenses: true,
+        api: false,
+        whiteLabel: false,
+      },
+      isPublic: true,
+      sortOrder: 1,
+      status: 'active',
+    },
+    {
+      name: 'ENTERPRISE',
+      slug: 'enterprise',
+      displayName: 'Enterprise',
+      description: 'For large businesses and franchises',
+      priceMonthly: 8499,
+      priceYearly: 84990, // 2 months free
+      currency: 'INR',
+      dodoProductId: process.env.DODO_PRODUCT_ENTERPRISE || null,
+      maxLocations: -1, // unlimited
+      maxTeamMembers: -1, // unlimited
+      maxOrdersPerMonth: -1, // unlimited
+      features: {
+        kitchenDisplay: true,
+        analytics: 'advanced',
+        inventory: true,
+        expenses: true,
+        api: true,
+        whiteLabel: true,
+      },
+      isPublic: true,
+      sortOrder: 2,
+      status: 'active',
+    },
+  ];
+
+  for (const plan of plans) {
+    const existing = await prisma.subscriptionPlan.findUnique({
+      where: { slug: plan.slug },
+    });
+
+    if (existing) {
+      console.log(`   ⏭️  Plan '${plan.name}' already exists, updating...`);
+      await prisma.subscriptionPlan.update({
+        where: { slug: plan.slug },
+        data: plan,
+      });
+    } else {
+      await prisma.subscriptionPlan.create({
+        data: plan,
+      });
+      console.log(`   ✅ Created plan: ${plan.name}`);
+    }
+  }
+
+  console.log('🎉 Subscription plan seeding completed!');
+}
+
 // High-quality food images from Unsplash (free to use)
 const images = {
   categories: {
@@ -795,9 +896,10 @@ async function seedMenuItems() {
 
 async function main() {
   try {
+    await seedSubscriptionPlans();
     await seedMenuItems();
   } catch (error) {
-    console.error('❌ Error seeding menu items:', error);
+    console.error('❌ Error seeding:', error);
     throw error;
   } finally {
     await prisma.$disconnect();

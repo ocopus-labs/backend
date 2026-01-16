@@ -13,7 +13,6 @@ Table restaurants {
   contact Json [not null]
   ownerId String [not null]
   businessInfo Json [not null]
-  subscription Json [not null]
   settings Json [not null]
   status String [not null, default: 'active']
   stats Json
@@ -30,6 +29,7 @@ Table restaurants {
   payments payments [not null]
   owner users [not null]
   tables tables [not null]
+  usageRecords usage_records [not null]
 }
 
 Table users {
@@ -51,6 +51,7 @@ Table users {
   payments payments [not null]
   ownedRestaurants restaurants [not null]
   sessions session [not null]
+  subscriptions subscriptions [not null]
 }
 
 Table business_users {
@@ -312,6 +313,80 @@ Table verification {
   updatedAt DateTime [default: `now()`, not null]
 }
 
+Table subscription_plans {
+  id String [pk]
+  name String [unique, not null]
+  slug String [unique, not null]
+  displayName String [not null]
+  description String
+  priceMonthly Decimal [not null, default: 0]
+  priceYearly Decimal
+  currency String [not null, default: 'INR']
+  dodoProductId String [unique]
+  maxLocations Int [not null]
+  maxTeamMembers Int [not null]
+  maxOrdersPerMonth Int [not null]
+  features Json [not null]
+  isPublic Boolean [not null, default: true]
+  sortOrder Int [not null, default: 0]
+  status String [not null, default: 'active']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  subscriptions subscriptions [not null]
+}
+
+Table subscriptions {
+  id String [pk]
+  userId String [not null]
+  planId String [not null]
+  status String [not null, default: 'active']
+  currentPeriodStart DateTime [not null]
+  currentPeriodEnd DateTime [not null]
+  cancelAtPeriodEnd Boolean [not null, default: false]
+  canceledAt DateTime
+  trialStart DateTime
+  trialEnd DateTime
+  dodoSubscriptionId String [unique]
+  dodoCustomerId String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  plan subscription_plans [not null]
+  usageRecords usage_records [not null]
+}
+
+Table usage_records {
+  id String [pk]
+  subscriptionId String [not null]
+  restaurantId String [not null]
+  periodStart DateTime [not null]
+  periodEnd DateTime [not null]
+  ordersCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  subscription subscriptions [not null]
+  restaurant restaurants [not null]
+
+  indexes {
+    (subscriptionId, restaurantId, periodStart) [unique]
+  }
+}
+
+Table webhook_events {
+  id String [pk]
+  provider String [not null, default: 'dodo']
+  eventType String [not null]
+  eventId String [unique, not null]
+  payload Json [not null]
+  status String [not null, default: 'pending']
+  processedAt DateTime
+  errorMessage String
+  retryCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
 Enum UserRole {
   OWNER
   MANAGER
@@ -429,3 +504,11 @@ Ref: audit_logs.userId > users.id
 Ref: session.userId > users.id [delete: Cascade]
 
 Ref: account.userId > users.id [delete: Cascade]
+
+Ref: subscriptions.userId > users.id [delete: Cascade]
+
+Ref: subscriptions.planId > subscription_plans.id
+
+Ref: usage_records.subscriptionId > subscriptions.id [delete: Cascade]
+
+Ref: usage_records.restaurantId > restaurants.id [delete: Cascade]
