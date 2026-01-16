@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import dotenv from 'dotenv';
+import * as bodyParser from 'body-parser';
 
 dotenv.config();
 
@@ -10,8 +11,21 @@ async function bootstrap() {
     bodyParser: false,
   });
 
-  // Set global API prefix (exclude Better Auth routes which handle their own /api/auth path)
-  app.setGlobalPrefix('api');
+  // Apply raw body capture for webhook routes BEFORE any other middleware
+  // This must be done first to capture the raw body for signature verification
+  app.use(
+    '/webhook/dodo',
+    bodyParser.json({
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf.toString('utf8');
+      },
+    }),
+  );
+
+  // Set global API prefix (exclude Better Auth routes and webhook routes)
+  app.setGlobalPrefix('api', {
+    exclude: ['webhook/dodo'],
+  });
 
   // Enable CORS for frontend
   app.enableCors({
