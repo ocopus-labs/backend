@@ -12,7 +12,8 @@ docs/
     ├── auth-setup.md                      # Authentication setup (Better Auth)
     ├── multi-business-architecture.md     # Multi-business type system
     ├── business-unification.md            # Business model unification strategy
-    └── mail-setup.md                      # Mail service setup (Resend)
+    ├── mail-setup.md                      # Mail service setup (Resend)
+    └── dodo-payments-setup.md             # Subscription & payments (Dodo)
 ```
 
 ## Quick Links
@@ -27,6 +28,7 @@ docs/
 ### Feature Guides
 - **[Authentication Setup](./guides/auth-setup.md)** - Better Auth integration, JWT, email verification, OTP
 - **[Mail Service Setup](./guides/mail-setup.md)** - Resend email service configuration
+- **[Dodo Payments Setup](./guides/dodo-payments-setup.md)** - Subscription billing with Dodo Payments
 
 ## Key Concepts
 
@@ -91,6 +93,8 @@ Key variables:
 - `BETTER_AUTH_SECRET` - Better Auth secret key
 - `RESEND_API_KEY` - Resend email API key
 - `DATABASE_URL` - PostgreSQL connection string
+- `DODO_API_KEY` - Dodo Payments API key
+- `DODO_WEBHOOK_SECRET` - Dodo webhook signature secret
 
 ## Build & Deploy
 
