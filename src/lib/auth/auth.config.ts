@@ -52,7 +52,10 @@ export const createAuthConfig = (
     emailVerification: {
       sendVerificationEmail: async ({ user, url }) => {
         try {
-          await mailService.sendVerificationEmail(user.email, url);
+          await mailService.sendVerificationEmail(user.email, {
+            userName: user.name || user.email.split('@')[0],
+            verificationUrl: url,
+          });
         } catch (error) {
           // Log the error but don't fail registration
           // User can request a new verification email later
@@ -158,6 +161,11 @@ export const createAuthConfig = (
 
     // Account linking
     socialProviders: {
+      google: {
+        prompt: 'select_account',
+        clientId: process.env.GOOGLE_CLIENT_ID as string,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      },
       // Add social providers later if needed
     },
   });
