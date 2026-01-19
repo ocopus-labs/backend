@@ -7,8 +7,7 @@ interface CreateCheckoutParams {
   customerEmail: string;
   customerName: string;
   customerId?: string;
-  successUrl: string;
-  cancelUrl: string;
+  returnUrl: string;
   metadata?: Record<string, string>;
 }
 
@@ -58,7 +57,7 @@ export class DodoService {
           quantity: 1,
         },
       ],
-      success_url: params.successUrl,
+      return_url: params.returnUrl,
       metadata: params.metadata || {},
     };
 

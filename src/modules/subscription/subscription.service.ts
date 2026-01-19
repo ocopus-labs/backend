@@ -87,8 +87,7 @@ export class SubscriptionService {
   async createCheckoutSession(
     user: User,
     planSlug: string,
-    successUrl?: string,
-    cancelUrl?: string,
+    returnUrl?: string,
   ) {
     const plan = await this.planService.getPlanBySlug(planSlug);
 
@@ -104,8 +103,7 @@ export class SubscriptionService {
       customerEmail: user.email,
       customerName: user.name || user.email.split('@')[0],
       customerId: subscription.dodoCustomerId || undefined,
-      successUrl: successUrl || `${this.appUrl}/dashboard/subscriptions/success`,
-      cancelUrl: cancelUrl || `${this.appUrl}/dashboard/subscriptions/cancelled`,
+      returnUrl: returnUrl || `${this.appUrl}/dashboard/subscriptions/result`,
       metadata: {
         user_id: user.id,
         plan_slug: planSlug,

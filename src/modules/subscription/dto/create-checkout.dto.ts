@@ -6,9 +6,5 @@ export class CreateCheckoutDto {
 
   @IsOptional()
   @IsUrl()
-  successUrl?: string;
-
-  @IsOptional()
-  @IsUrl()
-  cancelUrl?: string;
+  returnUrl?: string;
 }

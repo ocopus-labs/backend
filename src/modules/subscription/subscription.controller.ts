@@ -86,8 +86,7 @@ export class SubscriptionController {
     const checkout = await this.subscriptionService.createCheckoutSession(
       session.user as any,
       dto.planSlug,
-      dto.successUrl,
-      dto.cancelUrl,
+      dto.returnUrl,
     );
 
     return {

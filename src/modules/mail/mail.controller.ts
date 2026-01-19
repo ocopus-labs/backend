@@ -23,54 +23,57 @@ export class MailController {
    */
   @Post('welcome')
   async sendWelcome(
-    @Body() body: { email: string; name: string },
+    @Body() body: { email: string; name: string; dashboardUrl?: string },
   ) {
-    return await this.mailService.sendWelcomeEmail(body.email, body.name);
+    return await this.mailService.sendWelcomeEmail(body.email, {
+      userName: body.name,
+      dashboardUrl: body.dashboardUrl || '/dashboard',
+    });
   }
 
   /**
    * Send a verification email
    * POST /mail/verify
-   * Body: { email: string, verificationLink: string }
+   * Body: { email: string, verificationLink: string, name?: string }
    */
   @Post('verify')
   async sendVerification(
-    @Body() body: { email: string; verificationLink: string },
+    @Body() body: { email: string; verificationLink: string; name?: string },
   ) {
-    return await this.mailService.sendVerificationEmail(
-      body.email,
-      body.verificationLink,
-    );
+    return await this.mailService.sendVerificationEmail(body.email, {
+      userName: body.name || 'User',
+      verificationUrl: body.verificationLink,
+    });
   }
 
   /**
    * Send a password reset email
    * POST /mail/reset-password
-   * Body: { email: string, resetLink: string }
+   * Body: { email: string, resetLink: string, name?: string }
    */
   @Post('reset-password')
   async sendPasswordReset(
-    @Body() body: { email: string; resetLink: string },
+    @Body() body: { email: string; resetLink: string; name?: string },
   ) {
-    return await this.mailService.sendPasswordResetEmail(
-      body.email,
-      body.resetLink,
-    );
+    return await this.mailService.sendPasswordResetEmail(body.email, {
+      userName: body.name || 'User',
+      resetUrl: body.resetLink,
+    });
   }
 
   /**
    * Send a notification email
    * POST /mail/notify
-   * Body: { email: string, title: string, message: string }
+   * Body: { email: string, title: string, message: string, name?: string }
    */
   @Post('notify')
   async sendNotification(
-    @Body() body: { email: string; title: string; message: string },
+    @Body() body: { email: string; title: string; message: string; name?: string },
   ) {
-    return await this.mailService.sendNotification(
-      body.email,
-      body.title,
-      body.message,
-    );
+    return await this.mailService.sendNotification(body.email, {
+      userName: body.name || 'User',
+      title: body.title,
+      message: body.message,
+    });
   }
 }
