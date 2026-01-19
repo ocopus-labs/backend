@@ -15,6 +15,7 @@ import { ExpenseModule } from './modules/expense/expense.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { TeamModule } from './modules/team/team.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     AnalyticsModule,
     TeamModule,
     SubscriptionModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
