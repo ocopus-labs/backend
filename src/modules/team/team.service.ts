@@ -7,6 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
+import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
 import {
   InviteTeamMemberDto,
   AddExistingUserDto,
@@ -23,46 +24,64 @@ import {
 } from './interfaces';
 import {
   USER_ROLES,
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
   getRolePermissions,
   getRoleDisplayName,
   UserRole,
 } from 'src/lib/auth/roles.constants';
+import {
+  getResourceLabel,
+  type BusinessType,
+} from 'src/lib/auth/business-adapter';
 
 @Injectable()
 export class TeamService {
   private readonly logger = new Logger(TeamService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private usageTrackingService: UsageTrackingService,
+  ) {}
 
   /**
    * Get all team members for a business
    */
-  async findAll(restaurantId: string): Promise<TeamMember[]> {
-    const members = await this.prisma.businessUser.findMany({
-      where: { restaurantId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
+  async findAll(restaurantId: string, limit?: number, offset?: number): Promise<{ members: TeamMember[]; total: number }> {
+    const where = { restaurantId };
+    const [members, total] = await this.prisma.$transaction([
+      this.prisma.businessUser.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
           },
         },
-      },
-      orderBy: { joinedAt: 'asc' },
-    });
+        orderBy: { joinedAt: 'asc' },
+        ...(limit !== undefined && { take: limit }),
+        ...(offset !== undefined && { skip: offset }),
+      }),
+      this.prisma.businessUser.count({ where }),
+    ]);
 
-    return members.map((m) => ({
-      id: m.id,
-      userId: m.userId,
-      restaurantId: m.restaurantId,
-      role: m.role,
-      status: m.status,
-      permissions: m.permissions,
-      joinedAt: m.joinedAt,
-      user: m.user,
-    }));
+    return {
+      members: members.map((m) => ({
+        id: m.id,
+        userId: m.userId,
+        restaurantId: m.restaurantId,
+        role: m.role,
+        status: m.status,
+        permissions: m.permissions,
+        joinedAt: m.joinedAt,
+        user: m.user,
+      })),
+      total,
+    };
   }
 
   /**
@@ -71,32 +90,43 @@ export class TeamService {
   async findByStatus(
     restaurantId: string,
     status: TeamMemberStatus,
-  ): Promise<TeamMember[]> {
-    const members = await this.prisma.businessUser.findMany({
-      where: { restaurantId, status },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
+    limit?: number,
+    offset?: number,
+  ): Promise<{ members: TeamMember[]; total: number }> {
+    const where = { restaurantId, status };
+    const [members, total] = await this.prisma.$transaction([
+      this.prisma.businessUser.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
           },
         },
-      },
-      orderBy: { joinedAt: 'asc' },
-    });
+        orderBy: { joinedAt: 'asc' },
+        ...(limit !== undefined && { take: limit }),
+        ...(offset !== undefined && { skip: offset }),
+      }),
+      this.prisma.businessUser.count({ where }),
+    ]);
 
-    return members.map((m) => ({
-      id: m.id,
-      userId: m.userId,
-      restaurantId: m.restaurantId,
-      role: m.role,
-      status: m.status,
-      permissions: m.permissions,
-      joinedAt: m.joinedAt,
-      user: m.user,
-    }));
+    return {
+      members: members.map((m) => ({
+        id: m.id,
+        userId: m.userId,
+        restaurantId: m.restaurantId,
+        role: m.role,
+        status: m.status,
+        permissions: m.permissions,
+        joinedAt: m.joinedAt,
+        user: m.user,
+      })),
+      total,
+    };
   }
 
   /**
@@ -184,6 +214,7 @@ export class TeamService {
     restaurantId: string,
     dto: AddExistingUserDto,
     inviterId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<TeamMember> {
     // Check if user exists
     const user = await this.prisma.user.findUnique({
@@ -201,6 +232,15 @@ export class TeamService {
 
     if (existing) {
       throw new ConflictException('User is already a team member');
+    }
+
+    // Check team member limit
+    const limitCheck = await this.usageTrackingService.checkTeamMemberLimit(restaurantId);
+    if (!limitCheck.allowed) {
+      throw new ForbiddenException(
+        limitCheck.message ||
+          `Team member limit reached (${limitCheck.current}/${limitCheck.limit}). Please upgrade your subscription.`,
+      );
     }
 
     // Get permissions for role
@@ -232,7 +272,7 @@ export class TeamService {
       userId: dto.userId,
       role: dto.role,
       email: user.email,
-    });
+    }, context);
 
     this.logger.log(`User ${user.email} added to team as ${dto.role}`);
 
@@ -255,7 +295,17 @@ export class TeamService {
     restaurantId: string,
     dto: InviteTeamMemberDto,
     inviterId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<{ invitation: { email: string; role: string; status: string } }> {
+    // Check team member limit before processing invite
+    const limitCheck = await this.usageTrackingService.checkTeamMemberLimit(restaurantId);
+    if (!limitCheck.allowed) {
+      throw new ForbiddenException(
+        limitCheck.message ||
+          `Team member limit reached (${limitCheck.current}/${limitCheck.limit}). Please upgrade your subscription.`,
+      );
+    }
+
     // Check if user with email already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -280,6 +330,7 @@ export class TeamService {
           customPermissions: dto.customPermissions,
         },
         inviterId,
+        context,
       );
 
       return {
@@ -302,7 +353,7 @@ export class TeamService {
     await this.createAuditLog(restaurantId, inviterId, 'INVITE_MEMBER', 'team', null, {
       email: dto.email,
       role: dto.role,
-    });
+    }, context);
 
     this.logger.log(`Invitation sent to ${dto.email} for role ${dto.role}`);
 
@@ -638,7 +689,7 @@ export class TeamService {
     suspended: number;
     byRole: Record<string, number>;
   }> {
-    const members = await this.findAll(restaurantId);
+    const { members } = await this.findAll(restaurantId);
 
     const stats = {
       total: members.length,
@@ -663,6 +714,181 @@ export class TeamService {
     return stats;
   }
 
+  /**
+   * Get permission tree for the business, organized by category
+   */
+  async getPermissionTree(restaurantId: string): Promise<{
+    categories: {
+      category: string;
+      label: string;
+      businessLabel?: string;
+      permissions: { key: string; label: string; description?: string }[];
+    }[];
+    roleDefaults: Record<string, string[]>;
+    roles: { role: string; displayName: string }[];
+  }> {
+    // Get business type
+    const business = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { type: true },
+    });
+
+    const businessType = (business?.type || 'restaurant') as BusinessType;
+
+    // Category metadata for human-readable labels and descriptions
+    const categoryMeta: Record<string, { label: string; genericResource?: string; descriptions?: Record<string, string> }> = {
+      OPERATIONS: {
+        label: 'Operations',
+        genericResource: 'operations',
+        descriptions: {
+          CREATE: 'Create new operations',
+          READ: 'View operations',
+          UPDATE: 'Edit existing operations',
+          CANCEL: 'Cancel operations',
+          COMPLETE: 'Mark operations as complete',
+          VIEW_ALL: 'View all operations across staff',
+        },
+      },
+      BILLING: {
+        label: 'Billing & Payments',
+        genericResource: 'billing',
+        descriptions: {
+          CREATE_INVOICE: 'Create invoices',
+          READ_INVOICE: 'View invoices',
+          PROCESS_PAYMENT: 'Process payments',
+          REFUND: 'Issue refunds',
+          VIEW_REPORTS: 'View financial reports',
+          MANAGE_SUBSCRIPTIONS: 'Manage subscriptions',
+        },
+      },
+      CATALOG: {
+        label: 'Catalog / Menu',
+        genericResource: 'catalog',
+        descriptions: {
+          CREATE: 'Add new catalog items',
+          READ: 'View catalog items',
+          UPDATE: 'Edit catalog items',
+          DELETE: 'Remove catalog items',
+          PUBLISH: 'Publish catalog changes',
+        },
+      },
+      INVENTORY: {
+        label: 'Inventory',
+        genericResource: 'inventory',
+        descriptions: {
+          CREATE: 'Add inventory items',
+          READ: 'View inventory',
+          UPDATE: 'Edit inventory items',
+          DELETE: 'Remove inventory items',
+          MANAGE_STOCK: 'Manage stock levels',
+        },
+      },
+      SCHEDULING: {
+        label: 'Scheduling',
+        genericResource: 'scheduling',
+        descriptions: {
+          CREATE: 'Create schedule entries',
+          READ: 'View schedules',
+          UPDATE: 'Edit schedule entries',
+          DELETE: 'Remove schedule entries',
+          RESERVE: 'Make reservations',
+          MANAGE: 'Manage all schedules',
+        },
+      },
+      EXPENSE: {
+        label: 'Expenses',
+        genericResource: 'expense',
+        descriptions: {
+          CREATE: 'Create expenses',
+          READ: 'View expenses',
+          UPDATE: 'Edit expenses',
+          DELETE: 'Remove expenses',
+          APPROVE: 'Approve expenses',
+          REJECT: 'Reject expenses',
+        },
+      },
+      ANALYTICS: {
+        label: 'Analytics & Reporting',
+        genericResource: 'analytics',
+        descriptions: {
+          VIEW: 'View analytics',
+          EXPORT: 'Export analytics data',
+          SHARE: 'Share analytics reports',
+          ADVANCED_REPORTING: 'Access advanced reporting',
+        },
+      },
+      STAFF: {
+        label: 'Staff Management',
+        genericResource: 'staff',
+        descriptions: {
+          MANAGE: 'Manage staff members',
+          VIEW_ATTENDANCE: 'View attendance records',
+          MANAGE_SHIFTS: 'Manage shift schedules',
+          ASSIGN_TO_OPERATION: 'Assign staff to operations',
+        },
+      },
+      BUSINESS: {
+        label: 'Business Settings',
+        genericResource: 'business',
+        descriptions: {
+          CREATE: 'Create businesses',
+          READ: 'View business info',
+          UPDATE: 'Edit business settings',
+          DELETE: 'Delete businesses',
+          MANAGE_SETTINGS: 'Manage business settings',
+          VIEW_ANALYTICS: 'View business analytics',
+          MANAGE_STAFF: 'Manage business staff',
+          MANAGE_INVENTORY: 'Manage business inventory',
+        },
+      },
+    };
+
+    // Build categories from PERMISSIONS, skipping platform/franchise/user/business-type-specific
+    const skipCategories = ['PLATFORM', 'FRANCHISE', 'USER', 'RESTAURANT', 'SALON', 'GYM'];
+
+    const categories = Object.entries(PERMISSIONS)
+      .filter(([key]) => !skipCategories.includes(key))
+      .map(([categoryKey, perms]) => {
+        const meta = categoryMeta[categoryKey];
+        const label = meta?.label || categoryKey.charAt(0) + categoryKey.slice(1).toLowerCase();
+        const genericResource = meta?.genericResource;
+
+        const businessLabel = genericResource
+          ? getResourceLabel(businessType, genericResource)
+          : undefined;
+
+        const permissions = Object.entries(perms).map(([permName, permKey]) => ({
+          key: permKey as string,
+          label: permName
+            .split('_')
+            .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+            .join(' '),
+          description: meta?.descriptions?.[permName],
+        }));
+
+        return {
+          category: categoryKey,
+          label,
+          businessLabel: businessLabel && businessLabel !== genericResource ? businessLabel : undefined,
+          permissions,
+        };
+      });
+
+    // Build role defaults
+    const roleDefaults: Record<string, string[]> = {};
+    for (const [role, perms] of Object.entries(ROLE_PERMISSIONS)) {
+      roleDefaults[role] = perms;
+    }
+
+    // Build roles list (assignable roles only)
+    const roles = ASSIGNABLE_ROLES.map((role) => ({
+      role,
+      displayName: getRoleDisplayName(role as UserRole),
+    }));
+
+    return { categories, roleDefaults, roles };
+  }
+
   private async createAuditLog(
     restaurantId: string,
     userId: string,
@@ -670,6 +896,7 @@ export class TeamService {
     resource: string,
     resourceId: string | null,
     details: Record<string, unknown>,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
@@ -679,6 +906,8 @@ export class TeamService {
         resource,
         resourceId,
         details: details as object,
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
       },
     });
   }
