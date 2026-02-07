@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsObject,
   ValidateNested,
+  ValidateIf,
   MinLength,
   MaxLength,
   IsUrl,
@@ -17,22 +18,27 @@ import { BUSINESS_TYPES, BusinessType } from '../config/business-types.config';
 class AddressDto {
   @IsString()
   @IsOptional()
+  @MaxLength(255)
   street?: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
   city: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
   state?: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
   country: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(20)
   postalCode?: string;
 
   @IsNumber()
@@ -47,28 +53,34 @@ class AddressDto {
 class ContactDto {
   @IsEmail()
   @IsOptional()
+  @MaxLength(255)
   email?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(50)
   phone?: string;
 
   @IsUrl()
   @IsOptional()
+  @MaxLength(500)
   website?: string;
 }
 
 class SettingsDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(50)
   timezone: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(10)
   currency: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(10)
   taxRate?: string;
 }
 
@@ -87,12 +99,14 @@ export class CreateBusinessDto {
   @MaxLength(500)
   description?: string;
 
-  @IsString()
   @IsOptional()
+  @ValidateIf((o) => o.logo && !o.logo.startsWith('data:'))
+  @IsUrl({}, { message: 'logo must be a valid URL' })
   logo?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
   subType?: string;
 
   @IsObject()

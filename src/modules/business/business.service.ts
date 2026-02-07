@@ -34,66 +34,70 @@ export class BusinessService {
 
     const slug = await this.generateSlug(dto.name);
 
-    const business = await this.prisma.restaurant.create({
-      data: {
-        name: dto.name,
-        slug,
-        type: dto.type,
-        logo: dto.logo,
-        description: dto.description,
-        ownerId,
-        address: {
-          street: dto.address.street,
-          city: dto.address.city,
-          state: dto.address.state || '',
-          country: dto.address.country,
-          postalCode: dto.address.postalCode || '',
-          coordinates: dto.address.lat && dto.address.lng
-            ? { lat: dto.address.lat, lng: dto.address.lng }
-            : null,
-        },
-        contact: {
-          email: dto.contact.email,
-          phone: dto.contact.phone,
-          website: dto.contact.website || null,
-        },
-        businessInfo: {
+    const business = await this.prisma.$transaction(async (tx) => {
+      const biz = await tx.restaurant.create({
+        data: {
+          name: dto.name,
+          slug,
           type: dto.type,
-          subType: dto.subType || null,
+          logo: dto.logo,
+          description: dto.description,
+          ownerId,
+          address: {
+            street: dto.address.street,
+            city: dto.address.city,
+            state: dto.address.state || '',
+            country: dto.address.country,
+            postalCode: dto.address.postalCode || '',
+            coordinates: dto.address.lat && dto.address.lng
+              ? { lat: dto.address.lat, lng: dto.address.lng }
+              : null,
+          },
+          contact: {
+            email: dto.contact.email,
+            phone: dto.contact.phone,
+            website: dto.contact.website || null,
+          },
+          businessInfo: {
+            type: dto.type,
+            subType: dto.subType || null,
+          },
+          settings: {
+            timezone: dto.settings.timezone,
+            currency: dto.settings.currency,
+            taxRate: dto.settings.taxRate || '0',
+          },
+          status: 'active',
         },
-        settings: {
-          timezone: dto.settings.timezone,
-          currency: dto.settings.currency,
-          taxRate: dto.settings.taxRate || '0',
-        },
-        status: 'active',
-      },
-    });
+      });
 
-    // Create BusinessUser record with owner role
-    await this.prisma.businessUser.create({
-      data: {
-        restaurantId: business.id,
-        userId: ownerId,
-        role: USER_ROLES.RESTAURANT_OWNER,
-        status: 'active',
-        permissions: getRolePermissions(USER_ROLES.RESTAURANT_OWNER),
-      },
-    });
-
-    // Create audit log
-    await this.prisma.auditLog.create({
-      data: {
-        restaurantId: business.id,
-        userId: ownerId,
-        action: 'CREATE',
-        resource: 'business',
-        resourceId: business.id,
-        details: {
-          businessName: business.name,
-          businessType: business.type,
+      // Create BusinessUser record with owner role
+      await tx.businessUser.create({
+        data: {
+          restaurantId: biz.id,
+          userId: ownerId,
+          role: USER_ROLES.RESTAURANT_OWNER,
+          status: 'active',
+          permissions: getRolePermissions(USER_ROLES.RESTAURANT_OWNER),
         },
-      },
+      });
+
+      // Create audit log
+      await tx.auditLog.create({
+        data: {
+          restaurantId: biz.id,
+          userId: ownerId,
+          action: 'business.create',
+          resource: 'business',
+          resourceId: biz.id,
+          details: {
+            businessName: biz.name,
+            businessType: biz.type,
+          },
+        },
+      });
+
+      return biz;
     });
 
     this.logger.log(`Business created: ${business.name} (${business.id}) by user ${ownerId}`);
@@ -187,7 +191,7 @@ export class BusinessService {
       data: updateData,
     });
 
-    await this.createAuditLog(id, userId, 'UPDATE', 'business', { updatedFields: Object.keys(dto) });
+    await this.createAuditLog(id, userId, 'business.update', 'business', { updatedFields: Object.keys(dto) });
 
     return business;
   }
@@ -206,7 +210,7 @@ export class BusinessService {
       data: { settings: updatedSettings },
     });
 
-    await this.createAuditLog(id, userId, 'UPDATE', 'business_settings', { updatedFields: Object.keys(dto) });
+    await this.createAuditLog(id, userId, 'business.update_settings', 'business', { updatedFields: Object.keys(dto) });
 
     return updated;
   }
@@ -227,7 +231,7 @@ export class BusinessService {
       data: { logo: logoUrl },
     });
 
-    await this.createAuditLog(id, userId, 'UPDATE', 'business_logo', {});
+    await this.createAuditLog(id, userId, 'business.update_logo', 'business', {});
 
     return business;
   }
@@ -241,7 +245,7 @@ export class BusinessService {
       data: { status: 'deleted' },
     });
 
-    await this.createAuditLog(id, userId, 'DELETE', 'business', {});
+    await this.createAuditLog(id, userId, 'business.delete', 'business', {});
 
     this.logger.log(`Business ${id} deleted by user ${userId}`);
   }
@@ -293,6 +297,7 @@ export class BusinessService {
     action: string,
     resource: string,
     details: Record<string, unknown>,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
@@ -302,6 +307,8 @@ export class BusinessService {
         resource,
         resourceId: businessId,
         details: details as object,
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
       },
     });
   }

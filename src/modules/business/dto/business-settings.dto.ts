@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsObject, IsUrl, ValidateIf } from 'class-validator';
 
 export class UpdateBusinessSettingsDto {
   @IsString()
@@ -23,7 +23,8 @@ export class UpdateBusinessSettingsDto {
 }
 
 export class UpdateBusinessLogoDto {
-  @IsString()
   @IsNotEmpty()
+  @ValidateIf((o) => o.logo && !o.logo.startsWith('data:'))
+  @IsUrl({}, { message: 'logo must be a valid URL' })
   logo: string;
 }
