@@ -1,11 +1,14 @@
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import dotenv from 'dotenv';
 import * as bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   // Disable body parser for Better Auth
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
@@ -22,6 +25,9 @@ async function bootstrap() {
     }),
   );
 
+  // Parse cookies for impersonation and other cookie-based features
+  app.use(cookieParser());
+
   // Set global API prefix (exclude Better Auth routes and webhook routes)
   app.setGlobalPrefix('api', {
     exclude: ['webhook/dodo'],
@@ -33,13 +39,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app
-    .listen(process.env.PORT ?? 3000)
-    .then(() =>
-      console.log(`Server is running on port ${process.env.PORT ?? 3000}`),
-    )
-    .catch((err) => {
-      console.error('Error starting server:', err);
-    });
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+  logger.log(`Server is running on port ${port}`);
 }
 bootstrap();
