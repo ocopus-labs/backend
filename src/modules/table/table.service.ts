@@ -446,6 +446,7 @@ export class TableService {
     resource: string,
     resourceId: string,
     details: Record<string, unknown>,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
@@ -454,7 +455,11 @@ export class TableService {
         action,
         resource,
         resourceId,
-        details: details as object,
+        details: {
+          ...details,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        } as object,
       },
     });
   }

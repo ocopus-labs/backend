@@ -80,7 +80,7 @@ export class UpdateTableDto {
 
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(20)
   @IsOptional()
   capacity?: number;
 

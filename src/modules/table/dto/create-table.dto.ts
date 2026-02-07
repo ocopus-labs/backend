@@ -77,7 +77,7 @@ export class CreateTableDto {
 
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(20)
   capacity: number;
 
   @IsObject()

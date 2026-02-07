@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Req,
   HttpCode,
   HttpStatus,
   Logger,
@@ -16,7 +17,6 @@ import {
 } from '@nestjs/common';
 import { Session } from '@thallesp/nestjs-better-auth';
 import { TableService } from './table.service';
-import { BusinessService } from 'src/modules/business';
 import {
   CreateTableDto,
   UpdateTableDto,
@@ -25,6 +25,7 @@ import {
   EndTableSessionDto,
   AddMaintenanceLogDto,
 } from './dto';
+import { BusinessRoles } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { TableStatus } from './interfaces';
 
@@ -42,26 +43,16 @@ interface UserSession {
 export class TableController {
   private readonly logger = new Logger(TableController.name);
 
-  constructor(
-    private tableService: TableService,
-    private businessService: BusinessService,
-  ) {}
+  constructor(private tableService: TableService) {}
 
-  /**
-   * Create a new table
-   */
   @Post()
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async create(
     @Param('businessId') businessId: string,
     @Body() dto: CreateTableDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const table = await this.tableService.create(
       businessId,
       dto,
@@ -74,17 +65,12 @@ export class TableController {
     };
   }
 
-  /**
-   * List all tables for a business
-   */
   @Get()
   async findAll(
     @Param('businessId') businessId: string,
     @Query('status') status: TableStatus | undefined,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     if (status) {
       const tables = await this.tableService.findByStatus(businessId, status);
       return { tables };
@@ -94,46 +80,31 @@ export class TableController {
     return { tables };
   }
 
-  /**
-   * Get table statistics
-   */
   @Get('stats')
   async getStats(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     const stats = await this.tableService.getTableStats(businessId);
     return { stats };
   }
 
-  /**
-   * Get a table by ID
-   */
   @Get(':id')
   async findById(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     const table = await this.tableService.findByIdOrFail(businessId, id);
     return { table };
   }
 
-  /**
-   * Get a table by table number
-   */
   @Get('number/:tableNumber')
   async findByTableNumber(
     @Param('businessId') businessId: string,
     @Param('tableNumber') tableNumber: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     const table = await this.tableService.findByTableNumber(
       businessId,
       tableNumber,
@@ -146,22 +117,15 @@ export class TableController {
     return { table };
   }
 
-  /**
-   * Update a table
-   */
   @Patch(':id')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: UpdateTableDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const table = await this.tableService.update(
       businessId,
       id,
@@ -175,23 +139,15 @@ export class TableController {
     };
   }
 
-  /**
-   * Update table status
-   */
   @Patch(':id/status')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
   async updateStatus(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: UpdateTableStatusDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-      USER_ROLES.STAFF,
-    ]);
-
     const table = await this.tableService.updateStatus(
       businessId,
       id,
@@ -205,23 +161,14 @@ export class TableController {
     };
   }
 
-  /**
-   * Start a table session (mark as occupied with order)
-   */
   @Post(':id/session/start')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
   async startSession(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: StartTableSessionDto,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-      USER_ROLES.STAFF,
-    ]);
-
     const table = await this.tableService.startSession(
       businessId,
       id,
@@ -236,23 +183,14 @@ export class TableController {
     };
   }
 
-  /**
-   * End a table session (mark as available)
-   */
   @Post(':id/session/end')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
   async endSession(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: EndTableSessionDto,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-      USER_ROLES.STAFF,
-    ]);
-
     const table = await this.tableService.endSession(
       businessId,
       id,
@@ -265,22 +203,14 @@ export class TableController {
     };
   }
 
-  /**
-   * Add maintenance log entry
-   */
   @Post(':id/maintenance')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async addMaintenanceLog(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: AddMaintenanceLogDto,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const table = await this.tableService.addMaintenanceLog(
       businessId,
       id,
@@ -295,51 +225,18 @@ export class TableController {
     };
   }
 
-  /**
-   * Delete a table
-   */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER)
   async delete(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-    ]);
-
     await this.tableService.delete(businessId, id, session.user.id);
 
     return {
       message: 'Table deleted successfully',
     };
-  }
-
-  /**
-   * Helper to validate business access with optional role check
-   */
-  private async validateAccess(
-    userId: string,
-    businessId: string,
-    allowedRoles?: string[],
-  ): Promise<void> {
-    const hasAccess = await this.businessService.checkUserAccess(
-      userId,
-      businessId,
-    );
-    if (!hasAccess) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
-
-    if (allowedRoles) {
-      const role = await this.businessService.getUserRole(userId, businessId);
-      if (!role || !allowedRoles.includes(role)) {
-        throw new ForbiddenException(
-          'You do not have permission to perform this action',
-        );
-      }
-    }
   }
 }
