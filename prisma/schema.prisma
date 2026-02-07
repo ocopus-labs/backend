@@ -37,6 +37,8 @@ model Restaurant {
   orders            Order[]
   payments          Payment[]
   owner             User              @relation("RestaurantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  refunds           Refund[]
+  stockTransactions StockTransaction[]
   tables            Table[]
   usageRecords      UsageRecord[]
 
@@ -49,25 +51,31 @@ model Restaurant {
 }
 
 model User {
-  id               String         @id @default(uuid())
-  email            String         @unique
-  emailVerified    Boolean        @default(false) @map("email_verified")
-  name             String?
-  image            String?
-  role             String?        // For Better Auth admin plugin
-  banned           Boolean?       // For Better Auth admin plugin
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-  accounts         Account[]
-  auditLogs        AuditLog[]
-  businessUsers    BusinessUser[]
-  expensesApproved Expense[]      @relation("ExpenseApprover")
-  expensesCreated  Expense[]      @relation("ExpenseCreator")
-  orders           Order[]
-  payments         Payment[]      @relation("ProcessedPayments")
-  ownedRestaurants Restaurant[]   @relation("RestaurantOwner")
-  sessions         Session[]
-  subscriptions    Subscription[]
+  id                 String         @id @default(uuid())
+  email              String         @unique
+  emailVerified      Boolean        @default(false) @map("email_verified")
+  name               String?
+  image              String?
+  role               String?        // For Better Auth admin plugin
+  banned             Boolean?       // For Better Auth admin plugin
+  banReason          String?        @map("ban_reason")
+  twoFactorEnabled   Boolean?       @default(false) @map("two_factor_enabled")
+  preferences        Json?
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+  accounts           Account[]
+  auditLogs          AuditLog[]
+  businessUsers      BusinessUser[]
+  expensesApproved   Expense[]      @relation("ExpenseApprover")
+  expensesCreated    Expense[]      @relation("ExpenseCreator")
+  orders             Order[]
+  payments           Payment[]      @relation("ProcessedPayments")
+  ownedRestaurants   Restaurant[]   @relation("RestaurantOwner")
+  sessions           Session[]
+  subscriptions      Subscription[]
+  twoFactorEntries   TwoFactor[]
+  announcements      Announcement[]
+  announcementDismissals AnnouncementDismissal[]
 
   @@index([email])
   @@map("users")
@@ -131,12 +139,37 @@ model InventoryItem {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  stockTransactions StockTransaction[]
+
   @@unique([restaurantId, sku])
   @@index([restaurantId])
   @@index([category])
   @@index([status])
   @@index([currentStock])
   @@map("inventory_items")
+}
+
+model StockTransaction {
+  id              String        @id @default(uuid())
+  inventoryItemId String        @map("inventory_item_id")
+  restaurantId    String        @map("restaurant_id")
+  type            String        // add, remove, waste, adjust
+  quantity        Decimal       @db.Decimal(10, 3)
+  previousStock   Decimal       @map("previous_stock") @db.Decimal(10, 3)
+  newStock        Decimal       @map("new_stock") @db.Decimal(10, 3)
+  reason          String?
+  reference       String?
+  performedBy     String        @map("performed_by")
+  performedAt     DateTime      @default(now()) @map("performed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryItemId, performedAt(sort: Desc)])
+  @@index([restaurantId])
+  @@index([type])
+  @@index([performedAt(sort: Desc)])
+  @@map("stock_transactions")
 }
 
 model Order {
@@ -161,10 +194,11 @@ model Order {
   feedback                Json?
   timestamps              Json
   auditTrail              Json[]     @default([]) @map("audit_trail")
+  deletedAt               DateTime?  @map("deleted_at")
   createdAt               DateTime   @default(now()) @map("created_at")
   updatedAt               DateTime   @updatedAt @map("updated_at")
   restaurant              Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  staff                   User       @relation(fields: [staffId], references: [id])
+  staff                   User       @relation(fields: [staffId], references: [id], onDelete: Restrict)
   table                   Table?     @relation(fields: [tableId], references: [id])
   payments                Payment[]
 
@@ -175,6 +209,7 @@ model Order {
   @@index([status])
   @@index([paymentStatus])
   @@index([createdAt(sort: Desc)])
+  @@index([deletedAt])
   @@map("orders")
 }
 
@@ -199,11 +234,14 @@ model Payment {
   processedBy          String?    @map("processed_by")
   processedAt          DateTime?  @map("processed_at")
   settlementInfo       Json?      @map("settlement_info")
+  deletedAt            DateTime?  @map("deleted_at")
   createdAt            DateTime   @default(now()) @map("created_at")
   updatedAt            DateTime   @updatedAt @map("updated_at")
   order                Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   processor            User?      @relation("ProcessedPayments", fields: [processedBy], references: [id])
   restaurant           Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  refundRecords        Refund[]
 
   @@index([restaurantId, createdAt(sort: Desc)])
   @@index([orderId])
@@ -211,7 +249,27 @@ model Payment {
   @@index([paymentNumber])
   @@index([status])
   @@index([method])
+  @@index([deletedAt])
   @@map("payments")
+}
+
+model Refund {
+  id           String     @id @default(uuid())
+  paymentId    String     @map("payment_id")
+  restaurantId String     @map("restaurant_id")
+  amount       Decimal    @db.Decimal(10, 2)
+  reason       String
+  method       String     // original, cash, store_credit, etc.
+  refundedBy   String     @map("refunded_by")
+  refundedAt   DateTime   @default(now()) @map("refunded_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  payment      Payment    @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, refundedAt(sort: Desc)])
+  @@index([restaurantId])
+  @@index([refundedAt(sort: Desc)])
+  @@map("refunds")
 }
 
 model Table {
@@ -353,6 +411,18 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
+}
+
+model TwoFactor {
+  id          String @id @default(uuid())
+  secret      String
+  backupCodes String @map("backup_codes")
+  userId      String @map("user_id")
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([secret])
+  @@index([userId])
+  @@map("two_factor")
 }
 
 model Account {
@@ -583,4 +653,59 @@ model WebhookEvent {
   @@index([status])
   @@index([createdAt])
   @@map("webhook_events")
+}
+
+// ==================== ANNOUNCEMENT MODELS ====================
+
+model Announcement {
+  id          String    @id @default(uuid())
+  title       String
+  content     String    @db.Text
+  type        String    @default("info")  // info, warning, critical, maintenance
+  target      String    @default("all")   // all, business_owners, staff, specific_plan
+  targetMeta  Json?     @map("target_meta")
+  isActive    Boolean   @default(true) @map("is_active")
+  isPinned    Boolean   @default(false) @map("is_pinned")
+  publishAt   DateTime? @map("publish_at")
+  expiresAt   DateTime? @map("expires_at")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  creator     User      @relation(fields: [createdBy], references: [id])
+  dismissals  AnnouncementDismissal[]
+
+  @@index([isActive, publishAt])
+  @@index([expiresAt])
+  @@index([type])
+  @@map("announcements")
+}
+
+model AnnouncementDismissal {
+  id              String       @id @default(uuid())
+  announcementId  String       @map("announcement_id")
+  userId          String       @map("user_id")
+  dismissedAt     DateTime     @default(now()) @map("dismissed_at")
+
+  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@map("announcement_dismissals")
+}
+
+// ==================== IMPERSONATION MODELS ====================
+
+model ImpersonationSession {
+  id              String   @id @default(uuid())
+  adminUserId     String   @map("admin_user_id")
+  targetUserId    String   @map("target_user_id")
+  adminSessionId  String   @unique @map("admin_session_id")
+  impSessionId    String   @unique @map("imp_session_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  expiresAt       DateTime @map("expires_at")
+
+  @@index([adminUserId])
+  @@index([impSessionId])
+  @@map("impersonation_sessions")
 }
