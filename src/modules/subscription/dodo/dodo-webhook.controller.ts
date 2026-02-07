@@ -10,6 +10,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DodoService } from './dodo.service';
@@ -43,6 +44,7 @@ interface DodoWebhookPayload {
 
 @Controller('webhook')
 @AllowAnonymous()
+@SkipThrottle()
 export class DodoWebhookController {
   private readonly logger = new Logger(DodoWebhookController.name);
 
@@ -91,23 +93,27 @@ export class DodoWebhookController {
 
     this.logger.log(`Verified Dodo webhook: ${payload.type}`);
 
-    // Check idempotency - skip if already processed
+    // Check idempotency - only skip if already successfully processed
     const existing = await this.prisma.webhookEvent.findUnique({
       where: { eventId: webhookId },
     });
 
-    if (existing) {
+    if (existing && existing.status === 'processed') {
       this.logger.debug(`Webhook ${webhookId} already processed`);
       return res.json({ received: true, status: 'already_processed' });
     }
 
-    // Store webhook event
-    await this.prisma.webhookEvent.create({
-      data: {
+    // Store or update webhook event (supports retry of failed events)
+    await this.prisma.webhookEvent.upsert({
+      where: { eventId: webhookId },
+      create: {
         provider: 'dodo',
         eventType: payload.type,
         eventId: webhookId,
         payload: payload as any,
+        status: 'pending',
+      },
+      update: {
         status: 'pending',
       },
     });
@@ -142,8 +148,15 @@ export class DodoWebhookController {
         },
       });
 
-      // Still return 200 to prevent retries for unrecoverable errors
-      // Dodo will retry on 5xx errors
+      // Recoverable errors → 500 to trigger Dodo retry
+      if (this.isRecoverableError(error)) {
+        this.logger.warn(`Recoverable error, returning 500 for retry: ${error.message}`);
+        return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+          received: true,
+          error: 'Temporary failure, please retry',
+        });
+      }
+      // Unrecoverable errors → 200 to ACK and prevent infinite retries
     }
 
     return res.json({ received: true });
@@ -178,8 +191,22 @@ export class DodoWebhookController {
         await this.handlePaymentFailed(data);
         break;
 
+      case 'subscription.trialing':
+        await this.handleSubscriptionTrialing(data);
+        break;
+
+      case 'payment.refunded':
+        this.logger.warn(`Payment refunded: ${JSON.stringify({ payment_id: data.payment_id, subscription_id: data.subscription_id })}`);
+        break;
+
+      case 'payment.dispute.created':
+      case 'payment.dispute.won':
+      case 'payment.dispute.lost':
+        this.logger.warn(`Payment dispute event: ${type}, data: ${JSON.stringify({ payment_id: data.payment_id, subscription_id: data.subscription_id })}`);
+        break;
+
       default:
-        this.logger.debug(`Unhandled webhook type: ${type}`);
+        this.logger.warn(`Unhandled webhook type: ${type}`);
     }
   }
 
@@ -280,5 +307,62 @@ export class DodoWebhookController {
     }
 
     await this.subscriptionService.handlePaymentFailure(subscription_id);
+  }
+
+  /**
+   * Handle subscription.trialing event
+   */
+  private async handleSubscriptionTrialing(data: DodoWebhookPayload['data']) {
+    const { subscription_id } = data;
+
+    if (!subscription_id) {
+      return;
+    }
+
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { dodoSubscriptionId: subscription_id },
+    });
+
+    if (!subscription) {
+      this.logger.warn(`Subscription not found for trialing event: ${subscription_id}`);
+      return;
+    }
+
+    await this.prisma.subscription.update({
+      where: { id: subscription.id },
+      data: { status: 'trialing' },
+    });
+
+    this.logger.log(`Subscription ${subscription.id} set to trialing`);
+  }
+
+  /**
+   * Check if an error is recoverable (should trigger retry via 500 response)
+   */
+  private isRecoverableError(error: any): boolean {
+    const message = error?.message?.toLowerCase() || '';
+    const code = error?.code || '';
+
+    // Prisma connection / timeout errors
+    if (code === 'P1001' || code === 'P1002' || code === 'P1008' || code === 'P1017') {
+      return true;
+    }
+
+    // Network errors
+    if (code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'ETIMEDOUT') {
+      return true;
+    }
+
+    // Generic timeout / connection messages
+    if (
+      message.includes('timeout') ||
+      message.includes('connection refused') ||
+      message.includes('econnrefused') ||
+      message.includes('can\'t reach database')
+    ) {
+      return true;
+    }
+
+    return false;
   }
 }

@@ -2,6 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LimitCheckResult, UsageStats } from './interfaces';
 
+const FREE_PLAN_DEFAULTS = {
+  maxOrdersPerMonth: 100,
+  maxLocations: 1,
+  maxTeamMembers: 2,
+} as const;
+
 @Injectable()
 export class UsageTrackingService {
   private readonly logger = new Logger(UsageTrackingService.name);
@@ -111,7 +117,7 @@ export class UsageTrackingService {
       return {
         allowed: true,
         current: 0,
-        limit: 100,
+        limit: FREE_PLAN_DEFAULTS.maxOrdersPerMonth,
         message: 'No subscription found, using free plan limits',
       };
     }
@@ -159,9 +165,9 @@ export class UsageTrackingService {
         where: { ownerId: userId },
       });
       return {
-        allowed: currentCount < 1,
+        allowed: currentCount < FREE_PLAN_DEFAULTS.maxLocations,
         current: currentCount,
-        limit: 1,
+        limit: FREE_PLAN_DEFAULTS.maxLocations,
       };
     }
 
@@ -213,9 +219,9 @@ export class UsageTrackingService {
         where: { restaurantId },
       });
       return {
-        allowed: currentCount < 2,
+        allowed: currentCount < FREE_PLAN_DEFAULTS.maxTeamMembers,
         current: currentCount,
-        limit: 2,
+        limit: FREE_PLAN_DEFAULTS.maxTeamMembers,
       };
     }
 
@@ -285,11 +291,11 @@ export class UsageTrackingService {
 
     return {
       ordersThisMonth,
-      orderLimit: plan?.maxOrdersPerMonth ?? 100,
+      orderLimit: plan?.maxOrdersPerMonth ?? FREE_PLAN_DEFAULTS.maxOrdersPerMonth,
       locationsCount: restaurants.length,
-      locationLimit: plan?.maxLocations ?? 1,
+      locationLimit: plan?.maxLocations ?? FREE_PLAN_DEFAULTS.maxLocations,
       teamMembersCount,
-      teamMemberLimit: plan?.maxTeamMembers ?? 2,
+      teamMemberLimit: plan?.maxTeamMembers ?? FREE_PLAN_DEFAULTS.maxTeamMembers,
       periodStart: start,
       periodEnd: end,
     };

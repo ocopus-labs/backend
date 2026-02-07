@@ -9,7 +9,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { Session } from '@thallesp/nestjs-better-auth';
+import { Session, AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { SubscriptionService } from './subscription.service';
 import { PlanService } from './plan.service';
 import { CreateCheckoutDto, ChangePlanDto } from './dto';
@@ -36,6 +36,7 @@ export class SubscriptionController {
    * Get all available subscription plans
    */
   @Get('plans')
+  @AllowAnonymous()
   async getPlans() {
     const plans = await this.planService.getAllPublicPlans();
     return { plans };
@@ -71,6 +72,7 @@ export class SubscriptionController {
         currentPeriodStart: subscription.currentPeriodStart,
         currentPeriodEnd: subscription.currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        hasBillingAccount: !!subscription.dodoCustomerId,
       },
     };
   }
@@ -102,13 +104,17 @@ export class SubscriptionController {
     @Body() dto: ChangePlanDto,
     @Session() session: UserSession,
   ) {
-    const checkout = await this.subscriptionService.createCheckoutSession(
+    const result = await this.subscriptionService.changePlan(
       session.user as any,
       dto.planSlug,
     );
 
+    if (result.changed) {
+      return { message: 'Plan changed successfully' };
+    }
+
     return {
-      checkoutUrl: checkout.checkoutUrl,
+      checkoutUrl: result.checkoutUrl,
       message: 'Please complete checkout to change your plan',
     };
   }

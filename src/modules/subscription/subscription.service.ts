@@ -103,7 +103,7 @@ export class SubscriptionService {
       customerEmail: user.email,
       customerName: user.name || user.email.split('@')[0],
       customerId: subscription.dodoCustomerId || undefined,
-      returnUrl: returnUrl || `${this.appUrl}/dashboard/subscriptions/result`,
+      returnUrl: (returnUrl || `${this.appUrl}/dashboard/subscriptions/result`) + '?from=checkout',
       metadata: {
         user_id: user.id,
         plan_slug: planSlug,
@@ -307,6 +307,42 @@ export class SubscriptionService {
   /**
    * Get customer portal URL
    */
+  /**
+   * Change plan for an existing subscriber.
+   * Uses Dodo's changePlan API for active subscriptions, falls back to new checkout.
+   */
+  async changePlan(
+    user: User,
+    planSlug: string,
+  ): Promise<{ changed: boolean; checkoutUrl?: string }> {
+    const plan = await this.planService.getPlanBySlug(planSlug);
+
+    if (!plan.dodoProductId) {
+      throw new BadRequestException(`Plan '${planSlug}' is not available for purchase`);
+    }
+
+    const subscription = await this.getActiveSubscription(user.id);
+
+    // If user has an active Dodo subscription, use changePlan API directly
+    if (subscription?.dodoSubscriptionId && subscription.status === 'active') {
+      await this.dodoService.changePlan(
+        subscription.dodoSubscriptionId,
+        plan.dodoProductId,
+      );
+
+      this.logger.log(
+        `Changed plan for user ${user.id} to ${planSlug} via Dodo changePlan`,
+      );
+
+      return { changed: true };
+    }
+
+    // No active Dodo subscription - create a new checkout session
+    const checkout = await this.createCheckoutSession(user, planSlug);
+
+    return { changed: false, checkoutUrl: checkout.checkoutUrl };
+  }
+
   async getCustomerPortalUrl(userId: string): Promise<string> {
     const subscription = await this.getActiveSubscription(userId);
     if (!subscription?.dodoCustomerId) {
