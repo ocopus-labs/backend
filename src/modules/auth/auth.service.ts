@@ -349,4 +349,55 @@ export class AuthService {
       throw new InternalServerErrorException('Failed to verify email');
     }
   }
+
+  /**
+   * Get user notification preferences
+   */
+  async getUserPreferences(userId: string): Promise<Record<string, boolean>> {
+    const defaultPreferences = {
+      emailNotifications: true,
+      orderAlerts: true,
+      paymentAlerts: true,
+      securityAlerts: true,
+      weeklyDigest: true,
+      marketingEmails: false,
+      pushNotifications: false,
+    };
+
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { preferences: true },
+      });
+
+      return { ...defaultPreferences, ...(user?.preferences as Record<string, boolean> || {}) };
+    } catch (error) {
+      this.logger.error(`Error getting preferences: ${error}`);
+      return defaultPreferences;
+    }
+  }
+
+  /**
+   * Update user notification preferences
+   */
+  async updateUserPreferences(
+    userId: string,
+    preferences: Record<string, boolean>,
+  ): Promise<Record<string, boolean>> {
+    try {
+      const existing = await this.getUserPreferences(userId);
+      const merged = { ...existing, ...preferences };
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { preferences: merged },
+      });
+
+      this.logger.log(`Updated preferences for user ${userId}`);
+      return merged;
+    } catch (error) {
+      this.logger.error(`Error updating preferences: ${error}`);
+      throw new InternalServerErrorException('Failed to update preferences');
+    }
+  }
 }

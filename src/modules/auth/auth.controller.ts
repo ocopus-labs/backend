@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Param,
   Query,
@@ -20,6 +21,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { PermissionDto } from './dto/grant-permission.dto';
 import { BanUserDto } from './dto/ban-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 
 interface UserSession {
   user: UserWithRole;
@@ -44,6 +46,40 @@ export class AuthController {
     } catch (error) {
       this.logger.error('Error getting profile:', error);
       throw new InternalServerErrorException('Failed to get profile');
+    }
+  }
+
+  /**
+   * Get current user's notification preferences
+   */
+  @Get('me/preferences')
+  async getPreferences(@Session() session: UserSession) {
+    try {
+      const preferences = await this.authService.getUserPreferences(session.user.id);
+      return { preferences };
+    } catch (error) {
+      this.logger.error('Error getting preferences:', error);
+      throw new InternalServerErrorException('Failed to get preferences');
+    }
+  }
+
+  /**
+   * Update current user's notification preferences
+   */
+  @Patch('me/preferences')
+  async updatePreferences(
+    @Session() session: UserSession,
+    @Body() body: UpdatePreferencesDto,
+  ) {
+    try {
+      const preferences = await this.authService.updateUserPreferences(
+        session.user.id,
+        body as Record<string, boolean>,
+      );
+      return { preferences };
+    } catch (error) {
+      this.logger.error('Error updating preferences:', error);
+      throw new InternalServerErrorException('Failed to update preferences');
     }
   }
 
