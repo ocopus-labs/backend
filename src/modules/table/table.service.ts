@@ -281,8 +281,10 @@ export class TableService {
   ): Promise<Table> {
     const table = await this.findByIdOrFail(restaurantId, id);
 
-    if (table.status !== TABLE_STATUSES.OCCUPIED) {
-      throw new BadRequestException('Table is not currently occupied');
+    // Idempotent: if table is already available with no session, just return it
+    if (table.status === TABLE_STATUSES.AVAILABLE && !table.currentSession) {
+      this.logger.log(`Table ${table.tableNumber} already available, skipping endSession`);
+      return table;
     }
 
     const currentSession = table.currentSession as Record<string, unknown> | null;
