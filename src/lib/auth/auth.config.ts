@@ -1,8 +1,11 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { emailOTP, admin, openAPI } from 'better-auth/plugins';
+import { emailOTP, admin, openAPI, twoFactor } from 'better-auth/plugins';
 import { PrismaClient } from '@prisma/client';
+import { Logger } from '@nestjs/common';
 import type { MailService } from '../../modules/mail/mail.service';
+
+const logger = new Logger('AuthConfig');
 import {
   dodopayments,
   checkout,
@@ -59,9 +62,8 @@ export const createAuthConfig = (
         } catch (error) {
           // Log the error but don't fail registration
           // User can request a new verification email later
-          console.error(
-            `Failed to send verification email to ${user.email}:`,
-            error instanceof Error ? error.message : error,
+          logger.error(
+            `Failed to send verification email to ${user.email}: ${error instanceof Error ? error.message : error}`,
           );
         }
       },
@@ -97,9 +99,8 @@ export const createAuthConfig = (
             });
           } catch (error) {
             // Log the error but don't fail the OTP request
-            console.error(
-              `Failed to send OTP email to ${email}:`,
-              error instanceof Error ? error.message : error,
+            logger.error(
+              `Failed to send OTP email to ${email}: ${error instanceof Error ? error.message : error}`,
             );
           }
         },
@@ -119,6 +120,15 @@ export const createAuthConfig = (
         impersonationSessionDuration: 60 * 60 * 1, // 1 hour
       }),
 
+      // Two-Factor Authentication
+      twoFactor({
+        issuer: 'POS Platform',
+        backupCodes: {
+          length: 10,
+          characterSet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        },
+      }),
+
       // Dodo Payments Plugin (only if API key is configured)
       ...(dodoPaymentsClient
         ? [
@@ -136,9 +146,9 @@ export const createAuthConfig = (
                 }),
                 portal(),
                 webhooks({
-                  webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET || '',
-                  onPayload: async (payload) => {
-                    console.log('Dodo Payments webhook:', payload.event_type);
+                  webhookKey: process.env.DODO_WEBHOOK_SECRET || '',
+                  onPayload: async (_payload) => {
+                    // Webhook processing handled by DodoWebhookController
                   },
                 }),
                 usage(),
@@ -155,8 +165,8 @@ export const createAuthConfig = (
 
     // Session configuration
     session: {
-      expiresIn: 60 * 60 * 24 * 7, // 7 days
-      updateAge: 60 * 60 * 24, // Update every 1 day
+      expiresIn: 60 * 60 * 12, // 12 hours
+      updateAge: 60 * 60 * 1, // Update every 1 hour
     },
 
     // Account linking
