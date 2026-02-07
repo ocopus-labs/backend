@@ -28,6 +28,7 @@ export class InventoryService {
     restaurantId: string,
     dto: CreateInventoryItemDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<InventoryItem> {
     // Check for duplicate SKU
     const existing = await this.prisma.inventoryItem.findUnique({
@@ -67,7 +68,7 @@ export class InventoryService {
     await this.createAuditLog(restaurantId, userId, 'CREATE', 'inventory', item.id, {
       name: item.name,
       sku: item.sku,
-    });
+    }, context);
 
     this.logger.log(`Inventory item ${item.name} created for restaurant ${restaurantId}`);
 
@@ -81,8 +82,10 @@ export class InventoryService {
       status?: InventoryStatus;
       isActive?: boolean;
       lowStock?: boolean;
+      limit?: number;
+      offset?: number;
     },
-  ): Promise<InventoryItem[]> {
+  ): Promise<{ items: InventoryItem[]; total: number }> {
     const where: Record<string, unknown> = { restaurantId };
 
     if (options?.category) where.category = options.category;
@@ -92,10 +95,17 @@ export class InventoryService {
       where.status = { in: [INVENTORY_STATUSES.LOW_STOCK, INVENTORY_STATUSES.OUT_OF_STOCK] };
     }
 
-    return this.prisma.inventoryItem.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    });
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.inventoryItem.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        ...(options?.limit !== undefined && { take: options.limit }),
+        ...(options?.offset !== undefined && { skip: options.offset }),
+      }),
+      this.prisma.inventoryItem.count({ where }),
+    ]);
+
+    return { items, total };
   }
 
   async findById(restaurantId: string, id: string): Promise<InventoryItem | null> {
@@ -123,6 +133,7 @@ export class InventoryService {
     id: string,
     dto: UpdateInventoryItemDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<InventoryItem> {
     const existing = await this.findByIdOrFail(restaurantId, id);
 
@@ -164,7 +175,7 @@ export class InventoryService {
 
     await this.createAuditLog(restaurantId, userId, 'UPDATE', 'inventory', id, {
       updatedFields: Object.keys(dto),
-    });
+    }, context);
 
     return item;
   }
@@ -175,6 +186,7 @@ export class InventoryService {
     dto: StockTransactionDto,
     userId: string,
     userName: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<InventoryItem> {
     const item = await this.findByIdOrFail(restaurantId, id);
 
@@ -237,15 +249,34 @@ export class InventoryService {
       alerts.push(alert);
     }
 
-    const updatedItem = await this.prisma.inventoryItem.update({
-      where: { id },
-      data: {
-        currentStock: newStock,
-        totalValue,
-        status,
-        transactions: [...existingTransactions, transaction] as object[],
-        alerts: alerts as object[],
-      },
+    const updatedItem = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.inventoryItem.update({
+        where: { id },
+        data: {
+          currentStock: newStock,
+          totalValue,
+          status,
+          transactions: [...existingTransactions, transaction] as object[],
+          alerts: alerts as object[],
+        },
+      });
+
+      // Also write to the StockTransaction table
+      await tx.stockTransaction.create({
+        data: {
+          inventoryItemId: id,
+          restaurantId,
+          type: dto.type,
+          quantity: dto.quantity,
+          previousStock,
+          newStock,
+          reason: dto.reason,
+          reference: dto.reference,
+          performedBy: userName,
+        },
+      });
+
+      return updated;
     });
 
     await this.createAuditLog(restaurantId, userId, 'STOCK_TRANSACTION', 'inventory', id, {
@@ -253,7 +284,7 @@ export class InventoryService {
       quantity: dto.quantity,
       previousStock,
       newStock,
-    });
+    }, context);
 
     this.logger.log(
       `Stock ${dto.type} for ${item.name}: ${previousStock} -> ${newStock}`,
@@ -297,7 +328,7 @@ export class InventoryService {
     expiringCount: number;
     categoryBreakdown: Record<string, number>;
   }> {
-    const items = await this.findAll(restaurantId);
+    const { items } = await this.findAll(restaurantId);
     const expiringItems = await this.getExpiringItems(restaurantId);
 
     const stats = {
@@ -325,7 +356,7 @@ export class InventoryService {
     return stats;
   }
 
-  async delete(restaurantId: string, id: string, userId: string): Promise<void> {
+  async delete(restaurantId: string, id: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
     const item = await this.findByIdOrFail(restaurantId, id);
 
     // Soft delete - just mark as inactive
@@ -337,9 +368,31 @@ export class InventoryService {
     await this.createAuditLog(restaurantId, userId, 'DELETE', 'inventory', id, {
       name: item.name,
       sku: item.sku,
-    });
+    }, context);
 
     this.logger.log(`Inventory item ${item.name} deleted from restaurant ${restaurantId}`);
+  }
+
+  async getTransactionHistory(
+    restaurantId: string,
+    itemId: string,
+    options?: { limit?: number; offset?: number },
+  ) {
+    await this.findByIdOrFail(restaurantId, itemId);
+
+    const [transactions, total] = await Promise.all([
+      this.prisma.stockTransaction.findMany({
+        where: { inventoryItemId: itemId, restaurantId },
+        orderBy: { performedAt: 'desc' },
+        take: options?.limit || 50,
+        skip: options?.offset || 0,
+      }),
+      this.prisma.stockTransaction.count({
+        where: { inventoryItemId: itemId, restaurantId },
+      }),
+    ]);
+
+    return { transactions, total };
   }
 
   private calculateStatus(currentStock: number, minimumStock: number): InventoryStatus {
@@ -359,6 +412,7 @@ export class InventoryService {
     resource: string,
     resourceId: string,
     details: Record<string, unknown>,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
@@ -368,6 +422,8 @@ export class InventoryService {
         resource,
         resourceId,
         details: details as object,
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
       },
     });
   }
