@@ -32,6 +32,7 @@ export class ExpenseService {
     restaurantId: string,
     dto: CreateExpenseCategoryDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<ExpenseCategory> {
     const category = await this.prisma.expenseCategory.create({
       data: {
@@ -46,7 +47,7 @@ export class ExpenseService {
 
     await this.createAuditLog(restaurantId, userId, 'CREATE', 'expense_category', category.id, {
       name: category.name,
-    });
+    }, context);
 
     return category;
   }
@@ -80,6 +81,7 @@ export class ExpenseService {
     id: string,
     dto: UpdateExpenseCategoryDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<ExpenseCategory> {
     await this.findCategoryByIdOrFail(restaurantId, id);
 
@@ -90,12 +92,12 @@ export class ExpenseService {
 
     await this.createAuditLog(restaurantId, userId, 'UPDATE', 'expense_category', id, {
       updatedFields: Object.keys(dto),
-    });
+    }, context);
 
     return category;
   }
 
-  async deleteCategory(restaurantId: string, id: string, userId: string): Promise<void> {
+  async deleteCategory(restaurantId: string, id: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
     await this.findCategoryByIdOrFail(restaurantId, id);
 
     // Check if there are expenses using this category
@@ -116,7 +118,7 @@ export class ExpenseService {
       });
     }
 
-    await this.createAuditLog(restaurantId, userId, 'DELETE', 'expense_category', id, {});
+    await this.createAuditLog(restaurantId, userId, 'DELETE', 'expense_category', id, {}, context);
   }
 
   // ============ EXPENSE METHODS ============
@@ -125,6 +127,7 @@ export class ExpenseService {
     restaurantId: string,
     dto: CreateExpenseDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<Expense> {
     // Validate category exists
     await this.findCategoryByIdOrFail(restaurantId, dto.categoryId);
@@ -158,7 +161,7 @@ export class ExpenseService {
     await this.createAuditLog(restaurantId, userId, 'CREATE', 'expense', expense.id, {
       title: expense.title,
       amount: Number(expense.amount),
-    });
+    }, context);
 
     this.logger.log(`Expense ${expense.title} created for restaurant ${restaurantId}`);
 
@@ -173,8 +176,10 @@ export class ExpenseService {
       startDate?: Date;
       endDate?: Date;
       createdBy?: string;
+      limit?: number;
+      offset?: number;
     },
-  ): Promise<Expense[]> {
+  ): Promise<{ expenses: Expense[]; total: number }> {
     const where: Record<string, unknown> = { restaurantId };
 
     if (options?.categoryId) where.categoryId = options.categoryId;
@@ -186,15 +191,22 @@ export class ExpenseService {
       if (options.endDate) (where.expenseDate as Record<string, Date>).lte = options.endDate;
     }
 
-    return this.prisma.expense.findMany({
-      where,
-      include: {
-        category: true,
-        creator: { select: { id: true, name: true, email: true } },
-        approver: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { expenseDate: 'desc' },
-    });
+    const [expenses, total] = await this.prisma.$transaction([
+      this.prisma.expense.findMany({
+        where,
+        include: {
+          category: true,
+          creator: { select: { id: true, name: true, email: true } },
+          approver: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { expenseDate: 'desc' },
+        ...(options?.limit !== undefined && { take: options.limit }),
+        ...(options?.offset !== undefined && { skip: options.offset }),
+      }),
+      this.prisma.expense.count({ where }),
+    ]);
+
+    return { expenses, total };
   }
 
   async findById(restaurantId: string, id: string): Promise<Expense | null> {
@@ -221,6 +233,7 @@ export class ExpenseService {
     id: string,
     dto: UpdateExpenseDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<Expense> {
     const existing = await this.findByIdOrFail(restaurantId, id);
 
@@ -243,7 +256,7 @@ export class ExpenseService {
 
     await this.createAuditLog(restaurantId, userId, 'UPDATE', 'expense', id, {
       updatedFields: Object.keys(dto),
-    });
+    }, context);
 
     return expense;
   }
@@ -253,6 +266,7 @@ export class ExpenseService {
     id: string,
     userId: string,
     notes?: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<Expense> {
     const expense = await this.findByIdOrFail(restaurantId, id);
 
@@ -275,7 +289,7 @@ export class ExpenseService {
 
     await this.createAuditLog(restaurantId, userId, 'APPROVE', 'expense', id, {
       title: expense.title,
-    });
+    }, context);
 
     return updated;
   }
@@ -285,6 +299,7 @@ export class ExpenseService {
     id: string,
     userId: string,
     reason: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<Expense> {
     const expense = await this.findByIdOrFail(restaurantId, id);
 
@@ -308,7 +323,7 @@ export class ExpenseService {
     await this.createAuditLog(restaurantId, userId, 'REJECT', 'expense', id, {
       title: expense.title,
       reason,
-    });
+    }, context);
 
     return updated;
   }
@@ -318,6 +333,7 @@ export class ExpenseService {
     id: string,
     userId: string,
     notes?: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<Expense> {
     const expense = await this.findByIdOrFail(restaurantId, id);
 
@@ -338,12 +354,12 @@ export class ExpenseService {
 
     await this.createAuditLog(restaurantId, userId, 'MARK_PAID', 'expense', id, {
       title: expense.title,
-    });
+    }, context);
 
     return updated;
   }
 
-  async delete(restaurantId: string, id: string, userId: string): Promise<void> {
+  async delete(restaurantId: string, id: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
     const expense = await this.findByIdOrFail(restaurantId, id);
 
     if (expense.status === EXPENSE_STATUSES.PAID) {
@@ -356,7 +372,7 @@ export class ExpenseService {
 
     await this.createAuditLog(restaurantId, userId, 'DELETE', 'expense', id, {
       title: expense.title,
-    });
+    }, context);
 
     this.logger.log(`Expense ${expense.title} deleted from restaurant ${restaurantId}`);
   }
@@ -431,6 +447,7 @@ export class ExpenseService {
     resource: string,
     resourceId: string,
     details: Record<string, unknown>,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
@@ -440,6 +457,8 @@ export class ExpenseService {
         resource,
         resourceId,
         details: details as object,
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
       },
     });
   }

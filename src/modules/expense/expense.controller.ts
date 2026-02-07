@@ -7,16 +7,17 @@ import {
   Body,
   Param,
   Query,
+  Req,
+  Res,
   HttpCode,
   HttpStatus,
   Logger,
   UsePipes,
   ValidationPipe,
-  ForbiddenException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { Session } from '@thallesp/nestjs-better-auth';
 import { ExpenseService } from './expense.service';
-import { BusinessService } from 'src/modules/business';
 import {
   CreateExpenseCategoryDto,
   UpdateExpenseCategoryDto,
@@ -26,6 +27,7 @@ import {
   RejectExpenseDto,
   MarkAsPaidDto,
 } from './dto';
+import { BusinessRoles, generateCsv } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { ExpenseStatus } from './interfaces';
 
@@ -43,29 +45,23 @@ interface UserSession {
 export class ExpenseController {
   private readonly logger = new Logger(ExpenseController.name);
 
-  constructor(
-    private expenseService: ExpenseService,
-    private businessService: BusinessService,
-  ) {}
+  constructor(private expenseService: ExpenseService) {}
 
   // ============ CATEGORY ENDPOINTS ============
 
   @Post('categories')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async createCategory(
     @Param('businessId') businessId: string,
     @Body() dto: CreateExpenseCategoryDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const category = await this.expenseService.createCategory(
       businessId,
       dto,
       session.user.id,
+      { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     );
 
     return {
@@ -80,8 +76,6 @@ export class ExpenseController {
     @Query('all') all: string | undefined,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     const categories = await this.expenseService.findAllCategories(
       businessId,
       all !== 'true',
@@ -96,30 +90,25 @@ export class ExpenseController {
     @Param('id') id: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     const category = await this.expenseService.findCategoryByIdOrFail(businessId, id);
     return { category };
   }
 
   @Patch('categories/:id')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async updateCategory(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: UpdateExpenseCategoryDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const category = await this.expenseService.updateCategory(
       businessId,
       id,
       dto,
       session.user.id,
+      { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     );
 
     return {
@@ -130,17 +119,17 @@ export class ExpenseController {
 
   @Delete('categories/:id')
   @HttpCode(HttpStatus.OK)
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER)
   async deleteCategory(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-    ]);
-
-    await this.expenseService.deleteCategory(businessId, id, session.user.id);
+    await this.expenseService.deleteCategory(businessId, id, session.user.id, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     return {
       message: 'Expense category deleted successfully',
@@ -150,19 +139,17 @@ export class ExpenseController {
   // ============ EXPENSE ENDPOINTS ============
 
   @Post()
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
   async create(
     @Param('businessId') businessId: string,
     @Body() dto: CreateExpenseDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-      USER_ROLES.STAFF,
-    ]);
-
-    const expense = await this.expenseService.create(businessId, dto, session.user.id);
+    const expense = await this.expenseService.create(businessId, dto, session.user.id, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     return {
       message: 'Expense created successfully',
@@ -177,18 +164,60 @@ export class ExpenseController {
     @Query('status') status: ExpenseStatus | undefined,
     @Query('startDate') startDate: string | undefined,
     @Query('endDate') endDate: string | undefined,
-    @Session() session: UserSession,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Session() session?: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
-    const expenses = await this.expenseService.findAll(businessId, {
+    const result = await this.expenseService.findAll(businessId, {
       categoryId,
       status,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
     });
 
-    return { expenses };
+    return result;
+  }
+
+  @Get('export')
+  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  async exportExpenses(
+    @Param('businessId') businessId: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('status') status?: ExpenseStatus,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Res() res?: Response,
+  ) {
+    const result = await this.expenseService.findAll(businessId, {
+      categoryId,
+      status,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      limit: 10000,
+      offset: 0,
+    });
+
+    const expenses = result.expenses || [];
+    const headers = ['Date', 'Title', 'Category', 'Vendor', 'Amount', 'Tax', 'Payment Method', 'Status'];
+    const rows = expenses.map((e: any) => [
+      e.expenseDate ? new Date(e.expenseDate).toISOString().split('T')[0] : '',
+      e.title || '',
+      e.category?.name || '',
+      e.vendorName || '',
+      e.amount ?? 0,
+      e.taxAmount ?? 0,
+      e.paymentMethod || '',
+      e.status || '',
+    ]);
+
+    const csv = generateCsv(headers, rows);
+    res.set({
+      'Content-Type': 'text/csv',
+      'Content-Disposition': `attachment; filename="expenses-${new Date().toISOString().split('T')[0]}.csv"`,
+    });
+    return res.send(csv);
   }
 
   @Get('summary')
@@ -198,8 +227,6 @@ export class ExpenseController {
     @Query('endDate') endDate: string | undefined,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     const summary = await this.expenseService.getSummary(
       businessId,
       startDate ? new Date(startDate) : undefined,
@@ -210,16 +237,11 @@ export class ExpenseController {
   }
 
   @Get('pending')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async getPending(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const expenses = await this.expenseService.findAll(businessId, {
       status: 'pending',
     });
@@ -233,30 +255,25 @@ export class ExpenseController {
     @Param('id') id: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
-
     const expense = await this.expenseService.findByIdOrFail(businessId, id);
     return { expense };
   }
 
   @Patch(':id')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: UpdateExpenseDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const expense = await this.expenseService.update(
       businessId,
       id,
       dto,
       session.user.id,
+      { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     );
 
     return {
@@ -266,23 +283,20 @@ export class ExpenseController {
   }
 
   @Post(':id/approve')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async approve(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: ApproveExpenseDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const expense = await this.expenseService.approve(
       businessId,
       id,
       session.user.id,
       dto.notes,
+      { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     );
 
     return {
@@ -292,23 +306,20 @@ export class ExpenseController {
   }
 
   @Post(':id/reject')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
   async reject(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: RejectExpenseDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.MANAGER,
-    ]);
-
     const expense = await this.expenseService.reject(
       businessId,
       id,
       session.user.id,
       dto.reason,
+      { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     );
 
     return {
@@ -318,22 +329,20 @@ export class ExpenseController {
   }
 
   @Post(':id/mark-paid')
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER)
   async markAsPaid(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body() dto: MarkAsPaidDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-    ]);
-
     const expense = await this.expenseService.markAsPaid(
       businessId,
       id,
       session.user.id,
       dto.notes,
+      { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     );
 
     return {
@@ -344,38 +353,20 @@ export class ExpenseController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER)
   async delete(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateAccess(session.user.id, businessId, [
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.FRANCHISE_OWNER,
-    ]);
-
-    await this.expenseService.delete(businessId, id, session.user.id);
+    await this.expenseService.delete(businessId, id, session.user.id, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     return {
       message: 'Expense deleted successfully',
     };
-  }
-
-  private async validateAccess(
-    userId: string,
-    businessId: string,
-    allowedRoles?: string[],
-  ): Promise<void> {
-    const hasAccess = await this.businessService.checkUserAccess(userId, businessId);
-    if (!hasAccess) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
-
-    if (allowedRoles) {
-      const role = await this.businessService.getUserRole(userId, businessId);
-      if (!role || !allowedRoles.includes(role)) {
-        throw new ForbiddenException('You do not have permission to perform this action');
-      }
-    }
   }
 }
