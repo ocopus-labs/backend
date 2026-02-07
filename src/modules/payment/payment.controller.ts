@@ -2,24 +2,27 @@ import {
   Controller,
   Get,
   Post,
-  Patch,
+  Delete,
   Body,
   Param,
   Query,
+  Req,
+  Res,
   HttpCode,
   HttpStatus,
-  ForbiddenException,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { Session } from '@thallesp/nestjs-better-auth';
+import { Throttle } from '@nestjs/throttler';
 import { PaymentService } from './payment.service';
 import {
   CreatePaymentDto,
   CreateSplitPaymentDto,
   ProcessRefundDto,
 } from './dto';
-import { BusinessService } from '../business/business.service';
+import { BusinessRoles, generateCsv } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import type { PaymentMethod } from './interfaces';
 
@@ -34,81 +37,49 @@ interface UserSession {
 @Controller('business/:businessId/payments')
 @UsePipes(new ValidationPipe({ transform: true }))
 export class PaymentController {
-  constructor(
-    private readonly paymentService: PaymentService,
-    private readonly businessService: BusinessService,
-  ) {}
-
-  private async validateAccess(userId: string, businessId: string): Promise<void> {
-    const hasAccess = await this.businessService.checkUserAccess(userId, businessId);
-    if (!hasAccess) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
-  }
-
-  private async validateWriteAccess(userId: string, businessId: string): Promise<void> {
-    await this.validateAccess(userId, businessId);
-    const role = await this.businessService.getUserRole(userId, businessId);
-    const writeRoles: string[] = [
-      USER_ROLES.SUPER_ADMIN,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.MANAGER,
-      USER_ROLES.STAFF,
-    ];
-    if (!role || !writeRoles.includes(role)) {
-      throw new ForbiddenException('You do not have permission to process payments');
-    }
-  }
-
-  private async validateRefundAccess(userId: string, businessId: string): Promise<void> {
-    await this.validateAccess(userId, businessId);
-    const role = await this.businessService.getUserRole(userId, businessId);
-    const refundRoles: string[] = [
-      USER_ROLES.SUPER_ADMIN,
-      USER_ROLES.FRANCHISE_OWNER,
-      USER_ROLES.RESTAURANT_OWNER,
-      USER_ROLES.MANAGER,
-    ];
-    if (!role || !refundRoles.includes(role)) {
-      throw new ForbiddenException('You do not have permission to process refunds');
-    }
-  }
+  constructor(private readonly paymentService: PaymentService) {}
 
   @Post()
+  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @Throttle({ short: { ttl: 2000, limit: 1 }, medium: { ttl: 10000, limit: 5 } })
   async createPayment(
     @Param('businessId') businessId: string,
     @Body() dto: CreatePaymentDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateWriteAccess(session.user.id, businessId);
-    return this.paymentService.createPayment(businessId, session.user.id, dto);
+    return this.paymentService.createPayment(businessId, session.user.id, dto, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('split')
+  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @Throttle({ short: { ttl: 2000, limit: 1 }, medium: { ttl: 10000, limit: 5 } })
   async createSplitPayment(
     @Param('businessId') businessId: string,
     @Body() dto: CreateSplitPaymentDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateWriteAccess(session.user.id, businessId);
-    return this.paymentService.createSplitPayment(businessId, session.user.id, dto);
+    return this.paymentService.createSplitPayment(businessId, session.user.id, dto, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Get()
   async getPayments(
     @Param('businessId') businessId: string,
+    @Session() session: UserSession,
     @Query('method') method?: PaymentMethod,
     @Query('status') status?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
-    @Session() session?: UserSession,
   ) {
-    if (session) {
-      await this.validateAccess(session.user.id, businessId);
-    }
     return this.paymentService.getPayments(businessId, {
       method,
       status,
@@ -119,15 +90,50 @@ export class PaymentController {
     });
   }
 
+  @Get('export')
+  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  async exportPayments(
+    @Param('businessId') businessId: string,
+    @Query('status') status?: string,
+    @Query('method') method?: PaymentMethod,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Res() res?: Response,
+  ) {
+    const { payments } = await this.paymentService.getPayments(businessId, {
+      status,
+      method,
+      fromDate: startDate ? new Date(startDate) : undefined,
+      toDate: endDate ? new Date(endDate) : undefined,
+      limit: 10000,
+      offset: 0,
+    });
+
+    const headers = ['Payment #', 'Order #', 'Date', 'Customer', 'Method', 'Amount', 'Status'];
+    const rows = payments.map((p: any) => [
+      p.paymentNumber || '',
+      p.orderNumber || '',
+      p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : '',
+      p.customerInfo?.name || '',
+      p.method || '',
+      p.amount ?? 0,
+      p.status || '',
+    ]);
+
+    const csv = generateCsv(headers, rows);
+    res.set({
+      'Content-Type': 'text/csv',
+      'Content-Disposition': `attachment; filename="payments-${new Date().toISOString().split('T')[0]}.csv"`,
+    });
+    return res.send(csv);
+  }
+
   @Get('summary')
   async getPaymentSummary(
     @Param('businessId') businessId: string,
+    @Session() session: UserSession,
     @Query('date') date?: string,
-    @Session() session?: UserSession,
   ) {
-    if (session) {
-      await this.validateAccess(session.user.id, businessId);
-    }
     return this.paymentService.getPaymentSummary(
       businessId,
       date ? new Date(date) : undefined,
@@ -140,7 +146,6 @@ export class PaymentController {
     @Param('orderId') orderId: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
     return this.paymentService.getPaymentsByOrder(businessId, orderId);
   }
 
@@ -150,7 +155,6 @@ export class PaymentController {
     @Param('paymentId') paymentId: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
     return this.paymentService.getPaymentById(businessId, paymentId);
   }
 
@@ -160,19 +164,52 @@ export class PaymentController {
     @Param('paymentId') paymentId: string,
     @Session() session: UserSession,
   ) {
-    await this.validateAccess(session.user.id, businessId);
     return this.paymentService.generateReceipt(businessId, paymentId);
   }
 
   @Post(':paymentId/refund')
   @HttpCode(HttpStatus.OK)
+  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @Throttle({ short: { ttl: 2000, limit: 1 }, medium: { ttl: 10000, limit: 3 } })
   async processRefund(
     @Param('businessId') businessId: string,
     @Param('paymentId') paymentId: string,
     @Body() dto: ProcessRefundDto,
     @Session() session: UserSession,
+    @Req() req: any,
   ) {
-    await this.validateRefundAccess(session.user.id, businessId);
-    return this.paymentService.processRefund(businessId, paymentId, session.user.id, dto);
+    return this.paymentService.processRefund(businessId, paymentId, session.user.id, dto, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @Get(':paymentId/refunds')
+  async getRefunds(
+    @Param('businessId') businessId: string,
+    @Param('paymentId') paymentId: string,
+    @Session() session: UserSession,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.paymentService.getRefunds(businessId, paymentId, {
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+  }
+
+  @Delete(':paymentId')
+  @HttpCode(HttpStatus.OK)
+  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  async softDeletePayment(
+    @Param('businessId') businessId: string,
+    @Param('paymentId') paymentId: string,
+    @Session() session: UserSession,
+    @Req() req: any,
+  ) {
+    return this.paymentService.softDelete(businessId, paymentId, session.user.id, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 }
