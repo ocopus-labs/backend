@@ -5,9 +5,10 @@ import { OrderGateway } from './order.gateway';
 import { PrismaModule } from 'src/modules/prisma/prisma.module';
 import { BusinessModule } from 'src/modules/business/business.module';
 import { SubscriptionModule } from 'src/modules/subscription/subscription.module';
+import { TableModule } from 'src/modules/table/table.module';
 
 @Module({
-  imports: [PrismaModule, BusinessModule, forwardRef(() => SubscriptionModule)],
+  imports: [PrismaModule, BusinessModule, forwardRef(() => SubscriptionModule), TableModule],
   controllers: [OrderController],
   providers: [OrderService, OrderGateway],
   exports: [OrderService, OrderGateway],

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -17,13 +17,17 @@ import type {
 } from './interfaces';
 import { OrderGateway } from './order.gateway';
 import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
+import { TableService } from 'src/modules/table/table.service';
 
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly orderGateway: OrderGateway,
     private readonly usageTrackingService: UsageTrackingService,
+    private readonly tableService: TableService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -88,6 +92,7 @@ export class OrderService {
     staffId: string,
     staffName: string,
     dto: CreateOrderDto,
+    context?: { ipAddress?: string; userAgent?: string },
   ) {
     // Check subscription order limit
     const limitCheck = await this.usageTrackingService.checkOrderLimit(businessId);
@@ -142,7 +147,7 @@ export class OrderService {
     // Initial audit trail
     const auditTrail: OrderAuditEntry[] = [
       {
-        action: 'order_created',
+        action: 'order.create',
         performedBy: staffId,
         performedAt: now,
         details: { orderType: dto.orderType, itemCount: orderItems.length },
@@ -155,47 +160,53 @@ export class OrderService {
       estimatedCompletionTime = new Date(Date.now() + dto.estimatedMinutes * 60000);
     }
 
-    const order = await this.prisma.order.create({
-      data: {
-        orderNumber,
-        restaurantId: businessId,
-        tableId: dto.tableId || null,
-        tableNumber: dto.tableNumber || null,
-        staffId,
-        staffName,
-        orderType: dto.orderType,
-        customerInfo: (dto.customerInfo || {}) as object,
-        items: orderItems as unknown as object[],
-        pricing: pricing as unknown as object,
-        discountsApplied: discountsApplied as unknown as object[],
-        paymentStatus: 'pending',
-        balanceDue: pricing.total,
-        status: 'active',
-        priority: dto.priority || 'normal',
-        estimatedCompletionTime,
-        timestamps: timestamps as unknown as object,
-        auditTrail: auditTrail as unknown as object[],
-      },
-      include: {
-        table: true,
-      },
-    });
-
-    // Create audit log
-    await this.prisma.auditLog.create({
-      data: {
-        restaurantId: businessId,
-        userId: staffId,
-        action: 'order.create',
-        resource: 'order',
-        resourceId: order.id,
-        details: {
+    const order = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({
+        data: {
           orderNumber,
+          restaurantId: businessId,
+          tableId: dto.tableId || null,
+          tableNumber: dto.tableNumber || null,
+          staffId,
+          staffName,
           orderType: dto.orderType,
-          itemCount: orderItems.length,
-          total: pricing.total,
-        } as object,
-      },
+          customerInfo: (dto.customerInfo || {}) as object,
+          items: orderItems as unknown as object[],
+          pricing: pricing as unknown as object,
+          discountsApplied: discountsApplied as unknown as object[],
+          paymentStatus: 'pending',
+          balanceDue: pricing.total,
+          status: 'active',
+          priority: dto.priority || 'normal',
+          estimatedCompletionTime,
+          timestamps: timestamps as unknown as object,
+          auditTrail: auditTrail as unknown as object[],
+        },
+        include: {
+          table: true,
+        },
+      });
+
+      // Create audit log
+      await tx.auditLog.create({
+        data: {
+          restaurantId: businessId,
+          userId: staffId,
+          action: 'order.create',
+          resource: 'order',
+          resourceId: created.id,
+          details: {
+            orderNumber,
+            orderType: dto.orderType,
+            itemCount: orderItems.length,
+            total: pricing.total,
+          } as object,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        },
+      });
+
+      return created;
     });
 
     // Increment order usage for subscription tracking
@@ -219,7 +230,7 @@ export class OrderService {
       offset?: number;
     },
   ) {
-    const where: Record<string, unknown> = { restaurantId: businessId };
+    const where: Record<string, unknown> = { restaurantId: businessId, deletedAt: null };
 
     if (options?.status) {
       where.status = options.status;
@@ -261,7 +272,7 @@ export class OrderService {
 
   async getOrderById(businessId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, restaurantId: businessId },
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
       include: {
         table: true,
         staff: {
@@ -280,7 +291,7 @@ export class OrderService {
 
   async getOrderByNumber(businessId: string, orderNumber: string) {
     const order = await this.prisma.order.findFirst({
-      where: { orderNumber, restaurantId: businessId },
+      where: { orderNumber, restaurantId: businessId, deletedAt: null },
       include: {
         table: true,
         staff: {
@@ -302,6 +313,7 @@ export class OrderService {
       where: {
         restaurantId: businessId,
         status: 'active',
+        deletedAt: null,
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -322,7 +334,7 @@ export class OrderService {
     dto: UpdateOrderStatusDto,
   ) {
     const existing = await this.prisma.order.findFirst({
-      where: { id: orderId, restaurantId: businessId },
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!existing) {
@@ -346,7 +358,7 @@ export class OrderService {
 
     // Add audit entry
     auditTrail.push({
-      action: `status_changed_to_${dto.status}`,
+      action: `order.status_${dto.status}`,
       performedBy: staffId,
       performedAt: now,
       details: { reason: dto.reason, previousStatus: existing.status },
@@ -377,6 +389,17 @@ export class OrderService {
       },
     });
 
+    // Auto-end table session when order is completed or cancelled
+    if ((dto.status === 'completed' || dto.status === 'cancelled') && existing.tableId) {
+      try {
+        await this.tableService.endSession(businessId, existing.tableId, staffId);
+        this.logger.log(`Table session ended for table ${existing.tableId} (order ${dto.status})`);
+      } catch (err) {
+        // Don't fail the order update if table session end fails
+        this.logger.warn(`Failed to end table session for table ${existing.tableId}: ${err}`);
+      }
+    }
+
     // Emit WebSocket event for real-time updates
     if (dto.status === 'completed') {
       this.orderGateway.emitOrderCompleted(businessId, orderId);
@@ -394,7 +417,7 @@ export class OrderService {
     dto: AddItemsToOrderDto,
   ) {
     const existing = await this.prisma.order.findFirst({
-      where: { id: orderId, restaurantId: businessId },
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!existing) {
@@ -436,7 +459,7 @@ export class OrderService {
 
     // Add audit entry
     auditTrail.push({
-      action: 'items_added',
+      action: 'order.items_added',
       performedBy: staffId,
       performedAt: now,
       details: { itemsAdded: newItems.length, newItemNames: newItems.map((i) => i.name) },
@@ -465,7 +488,7 @@ export class OrderService {
     dto: UpdateItemQuantityDto,
   ) {
     const existing = await this.prisma.order.findFirst({
-      where: { id: orderId, restaurantId: businessId },
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!existing) {
@@ -505,7 +528,7 @@ export class OrderService {
 
     // Add audit entry
     auditTrail.push({
-      action: 'item_quantity_updated',
+      action: 'order.item_quantity_updated',
       performedBy: staffId,
       performedAt: now,
       details: { itemId: dto.itemId, oldQuantity, newQuantity: dto.quantity },
@@ -535,7 +558,7 @@ export class OrderService {
     status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled',
   ) {
     const existing = await this.prisma.order.findFirst({
-      where: { id: orderId, restaurantId: businessId },
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!existing) {
@@ -562,7 +585,7 @@ export class OrderService {
 
     // Add audit entry
     auditTrail.push({
-      action: 'item_status_updated',
+      action: 'order.item_status_updated',
       performedBy: staffId,
       performedAt: now,
       details: { itemId, oldStatus, newStatus: status },
@@ -597,7 +620,7 @@ export class OrderService {
     itemId: string,
   ) {
     const existing = await this.prisma.order.findFirst({
-      where: { id: orderId, restaurantId: businessId },
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!existing) {
@@ -637,7 +660,7 @@ export class OrderService {
 
     // Add audit entry
     auditTrail.push({
-      action: 'item_removed',
+      action: 'order.item_removed',
       performedBy: staffId,
       performedAt: now,
       details: { itemId, itemName: itemToRemove.name },
@@ -666,7 +689,7 @@ export class OrderService {
     dto: ApplyDiscountDto,
   ) {
     const existing = await this.prisma.order.findFirst({
-      where: { id: orderId, restaurantId: businessId },
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!existing) {
@@ -703,7 +726,7 @@ export class OrderService {
 
     // Add audit entry
     auditTrail.push({
-      action: 'discount_applied',
+      action: 'order.discount_applied',
       performedBy: staffId,
       performedAt: now,
       details: { type: dto.type, value: dto.value, amount: pricing.discountAmount },
@@ -731,6 +754,7 @@ export class OrderService {
         restaurantId: businessId,
         tableId,
         status: 'active',
+        deletedAt: null,
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -745,7 +769,7 @@ export class OrderService {
 
   async getOrderStats(businessId: string, date?: Date) {
     const startOfDay = date
-      ? new Date(date.setHours(0, 0, 0, 0))
+      ? new Date(new Date(date).setHours(0, 0, 0, 0))
       : new Date(new Date().setHours(0, 0, 0, 0));
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
@@ -754,6 +778,7 @@ export class OrderService {
       this.prisma.order.findMany({
         where: {
           restaurantId: businessId,
+          deletedAt: null,
           createdAt: { gte: startOfDay, lt: endOfDay },
         },
         select: {
@@ -766,6 +791,7 @@ export class OrderService {
         where: {
           restaurantId: businessId,
           status: 'completed',
+          deletedAt: null,
           createdAt: { gte: startOfDay, lt: endOfDay },
         },
       }),
@@ -773,6 +799,7 @@ export class OrderService {
         where: {
           restaurantId: businessId,
           status: 'cancelled',
+          deletedAt: null,
           createdAt: { gte: startOfDay, lt: endOfDay },
         },
       }),
@@ -808,6 +835,7 @@ export class OrderService {
       where: {
         restaurantId: businessId,
         status: 'completed',
+        deletedAt: null,
         createdAt: { gte: startDate },
       },
       select: {
@@ -858,6 +886,7 @@ export class OrderService {
       where: {
         restaurantId: businessId,
         status: 'completed',
+        deletedAt: null,
         createdAt: { gte: startDate },
       },
       select: {
@@ -910,6 +939,7 @@ export class OrderService {
         restaurantId: businessId,
         status: 'completed',
         paymentStatus: 'paid',
+        deletedAt: null,
         createdAt: { gte: startDate },
       },
       select: {
@@ -940,5 +970,48 @@ export class OrderService {
     }));
 
     return { trends };
+  }
+
+  async softDelete(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status === 'active') {
+      throw new BadRequestException('Cannot delete an active order. Cancel it first.');
+    }
+
+    const order = await this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.order.update({
+        where: { id: orderId },
+        data: { deletedAt: new Date() },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId: businessId,
+          userId: staffId,
+          action: 'order.delete',
+          resource: 'order',
+          resourceId: orderId,
+          details: { orderNumber: existing.orderNumber } as object,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        },
+      });
+
+      return deleted;
+    });
+
+    return { message: 'Order deleted successfully', order };
   }
 }
