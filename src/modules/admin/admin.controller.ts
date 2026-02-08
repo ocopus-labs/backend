@@ -108,7 +108,15 @@ export class AdminController {
       search,
     });
 
-    const headers = ['Name', 'Type', 'Owner', 'Status', 'Created', 'Orders', 'Team Size'];
+    const headers = [
+      'Name',
+      'Type',
+      'Owner',
+      'Status',
+      'Created',
+      'Orders',
+      'Team Size',
+    ];
     const rows = result.data.map((biz: any) => [
       biz.name || '',
       biz.type || '',
@@ -149,11 +157,15 @@ export class AdminController {
     @Body() dto: UpdateBusinessStatusDto,
     @Req() req: Request,
   ) {
-    const business = await this.adminService.updateBusinessStatus(id, dto.status, {
-      userId: (req as any).user?.id,
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const business = await this.adminService.updateBusinessStatus(
+      id,
+      dto.status,
+      {
+        userId: (req as any).user?.id,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
     return { message: 'Business status updated successfully', business };
   }
 
@@ -196,14 +208,25 @@ export class AdminController {
       role,
     });
 
-    const headers = ['Name', 'Email', 'Role', 'Verified', 'Banned', 'Created', 'Businesses', 'Orders'];
+    const headers = [
+      'Name',
+      'Email',
+      'Role',
+      'Verified',
+      'Banned',
+      'Created',
+      'Businesses',
+      'Orders',
+    ];
     const rows = result.data.map((user: any) => [
       user.name || '',
       user.email || '',
       user.role || '',
       user.emailVerified ? 'Yes' : 'No',
       user.banned ? 'Yes' : 'No',
-      user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : '',
+      user.createdAt
+        ? new Date(user.createdAt).toISOString().split('T')[0]
+        : '',
       user._count?.businessUsers ?? 0,
       user._count?.orders ?? 0,
     ]);
@@ -390,9 +413,7 @@ export class AdminController {
       sub.currentPeriodEnd
         ? new Date(sub.currentPeriodEnd).toISOString().split('T')[0]
         : '',
-      sub.createdAt
-        ? new Date(sub.createdAt).toISOString().split('T')[0]
-        : '',
+      sub.createdAt ? new Date(sub.createdAt).toISOString().split('T')[0] : '',
     ]);
 
     const csv = generateCsv(headers, rows);
@@ -408,10 +429,7 @@ export class AdminController {
    */
   @Patch('subscriptions/:id/cancel')
   @HttpCode(HttpStatus.OK)
-  async cancelSubscription(
-    @Param('id') id: string,
-    @Req() req: Request,
-  ) {
+  async cancelSubscription(@Param('id') id: string, @Req() req: Request) {
     const subscription = await this.adminService.cancelSubscription(id, {
       adminId: (req as any).user?.id,
       ipAddress: req.ip,
@@ -574,10 +592,7 @@ export class AdminController {
    */
   @Patch('plans/:id')
   @HttpCode(HttpStatus.OK)
-  async updatePlan(
-    @Param('id') id: string,
-    @Body() dto: UpdatePlanDto,
-  ) {
+  async updatePlan(@Param('id') id: string, @Body() dto: UpdatePlanDto) {
     const plan = await this.adminService.updatePlan(id, dto);
     return { message: 'Plan updated successfully', plan };
   }
@@ -589,7 +604,10 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async archivePlan(@Param('id') id: string) {
     const plan = await this.adminService.archivePlan(id);
-    return { message: `Plan ${plan.status === 'archived' ? 'archived' : 'restored'} successfully`, plan };
+    return {
+      message: `Plan ${plan.status === 'archived' ? 'archived' : 'restored'} successfully`,
+      plan,
+    };
   }
 
   // ==================== IMPERSONATION ====================
@@ -621,9 +639,10 @@ export class AdminController {
     );
 
     // Store admin's original session token in a separate cookie
-    const currentSessionToken = req.cookies?.['better-auth.session_token']
-      || req.cookies?.['__Secure-better-auth.session_token']
-      || '';
+    const currentSessionToken =
+      req.cookies?.['better-auth.session_token'] ||
+      req.cookies?.['__Secure-better-auth.session_token'] ||
+      '';
 
     const isProduction = process.env.NODE_ENV === 'production';
     const cookieName = isProduction

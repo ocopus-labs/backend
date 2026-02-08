@@ -1,14 +1,32 @@
-import { Injectable, Logger, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { BulkUserActionDto, BulkUserAction } from './dto/bulk-user-action.dto';
-import { BulkBusinessActionDto, BulkBusinessAction } from './dto/bulk-business-action.dto';
-import { BulkSubscriptionActionDto, BulkSubscriptionAction } from './dto/bulk-subscription-action.dto';
+import {
+  BulkBusinessActionDto,
+  BulkBusinessAction,
+} from './dto/bulk-business-action.dto';
+import {
+  BulkSubscriptionActionDto,
+  BulkSubscriptionAction,
+} from './dto/bulk-subscription-action.dto';
 
-const BUSINESS_SORT_ALLOWLIST = ['name', 'createdAt', 'status', 'type', 'updatedAt'];
+const BUSINESS_SORT_ALLOWLIST = [
+  'name',
+  'createdAt',
+  'status',
+  'type',
+  'updatedAt',
+];
 const USER_SORT_ALLOWLIST = ['name', 'email', 'createdAt', 'role', 'updatedAt'];
 const WEBHOOK_SORT_ALLOWLIST = ['createdAt', 'provider', 'eventType', 'status'];
 const MAX_PAGE_LIMIT = 100;
@@ -141,7 +159,13 @@ export class AdminService {
       }),
       // Recent businesses
       this.prisma.restaurant.findMany({
-        select: { id: true, name: true, type: true, status: true, createdAt: true },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          status: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
@@ -204,12 +228,12 @@ export class AdminService {
     // Process subscription stats
     const byPlan: Record<string, number> = {};
     if (subscriptionsByPlan.length > 0) {
-      const planIds = subscriptionsByPlan.map(s => s.planId);
+      const planIds = subscriptionsByPlan.map((s) => s.planId);
       const plans = await this.prisma.subscriptionPlan.findMany({
         where: { id: { in: planIds } },
         select: { id: true, name: true },
       });
-      const planNameMap = new Map(plans.map(p => [p.id, p.name]));
+      const planNameMap = new Map(plans.map((p) => [p.id, p.name]));
       for (const group of subscriptionsByPlan) {
         const planName = planNameMap.get(group.planId) || String(group.planId);
         byPlan[planName] = group._count._all;
@@ -410,10 +434,13 @@ export class AdminService {
     const orderBy: Prisma.RestaurantOrderByWithRelationInput = {};
     if (filters.sortBy) {
       if (!BUSINESS_SORT_ALLOWLIST.includes(filters.sortBy)) {
-        throw new BadRequestException(`Invalid sortBy field: ${filters.sortBy}. Allowed: ${BUSINESS_SORT_ALLOWLIST.join(', ')}`);
+        throw new BadRequestException(
+          `Invalid sortBy field: ${filters.sortBy}. Allowed: ${BUSINESS_SORT_ALLOWLIST.join(', ')}`,
+        );
       }
-      orderBy[filters.sortBy as keyof Prisma.RestaurantOrderByWithRelationInput] =
-        filters.sortOrder || 'desc';
+      orderBy[
+        filters.sortBy as keyof Prisma.RestaurantOrderByWithRelationInput
+      ] = filters.sortOrder || 'desc';
     } else {
       orderBy.createdAt = 'desc';
     }
@@ -514,7 +541,10 @@ export class AdminService {
     context?: { userId?: string; ipAddress?: string; userAgent?: string },
   ): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
-      const previous = await tx.restaurant.findUnique({ where: { id }, select: { status: true } });
+      const previous = await tx.restaurant.findUnique({
+        where: { id },
+        select: { status: true },
+      });
       const business = await tx.restaurant.update({
         where: { id },
         data: { status },
@@ -567,7 +597,9 @@ export class AdminService {
     const orderBy: Prisma.UserOrderByWithRelationInput = {};
     if (filters.sortBy) {
       if (!USER_SORT_ALLOWLIST.includes(filters.sortBy)) {
-        throw new BadRequestException(`Invalid sortBy field: ${filters.sortBy}. Allowed: ${USER_SORT_ALLOWLIST.join(', ')}`);
+        throw new BadRequestException(
+          `Invalid sortBy field: ${filters.sortBy}. Allowed: ${USER_SORT_ALLOWLIST.join(', ')}`,
+        );
       }
       orderBy[filters.sortBy as keyof Prisma.UserOrderByWithRelationInput] =
         filters.sortOrder || 'desc';
@@ -619,12 +651,25 @@ export class AdminService {
         businessUsers: {
           include: {
             restaurant: {
-              select: { id: true, name: true, slug: true, type: true, status: true },
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                type: true,
+                status: true,
+              },
             },
           },
         },
         ownedRestaurants: {
-          select: { id: true, name: true, slug: true, type: true, status: true, createdAt: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            type: true,
+            status: true,
+            createdAt: true,
+          },
         },
         subscriptions: {
           include: {
@@ -646,7 +691,10 @@ export class AdminService {
     role: string,
     context?: { adminId?: string; ipAddress?: string; userAgent?: string },
   ): Promise<any> {
-    const previousUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const previousUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { role },
@@ -662,7 +710,13 @@ export class AdminService {
   async getAuditLogs(
     page: number = 1,
     limit: number = 50,
-    filters: { userId?: string; resource?: string; action?: string; startDate?: Date; endDate?: Date } = {},
+    filters: {
+      userId?: string;
+      resource?: string;
+      action?: string;
+      startDate?: Date;
+      endDate?: Date;
+    } = {},
   ): Promise<PaginatedResult<any>> {
     const safeLimit = Math.min(Math.max(limit, 1), MAX_PAGE_LIMIT);
     const skip = (page - 1) * safeLimit;
@@ -718,10 +772,7 @@ export class AdminService {
     };
   }
 
-  async getPlatformAnalytics(
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<any> {
+  async getPlatformAnalytics(startDate?: Date, endDate?: Date): Promise<any> {
     // Validate dates
     if (startDate && isNaN(startDate.getTime())) {
       throw new BadRequestException('Invalid startDate');
@@ -734,7 +785,8 @@ export class AdminService {
     }
 
     const now = new Date();
-    const start = startDate || new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const start =
+      startDate || new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const end = endDate || now;
 
     // Helper function to convert BigInt values to numbers
@@ -872,15 +924,21 @@ export class AdminService {
     context?: { adminId?: string; ipAddress?: string; userAgent?: string },
   ): Promise<any> {
     if (days < 1 || days > 90) {
-      throw new BadRequestException('Trial extension must be between 1 and 90 days');
+      throw new BadRequestException(
+        'Trial extension must be between 1 and 90 days',
+      );
     }
 
-    const subscription = await this.prisma.subscription.findUnique({ where: { id } });
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id },
+    });
     if (!subscription) {
       throw new BadRequestException('Subscription not found');
     }
     if (subscription.status !== 'trialing') {
-      throw new BadRequestException('Only trialing subscriptions can be extended');
+      throw new BadRequestException(
+        'Only trialing subscriptions can be extended',
+      );
     }
 
     const newEnd = new Date(subscription.currentPeriodEnd);
@@ -898,10 +956,7 @@ export class AdminService {
     return updated;
   }
 
-  async getActivityFeed(
-    limit: number = 20,
-    since?: string,
-  ): Promise<any[]> {
+  async getActivityFeed(limit: number = 20, since?: string): Promise<any[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
 
     const where: Prisma.AuditLogWhereInput = {};
@@ -949,8 +1004,7 @@ export class AdminService {
     const descriptions: Record<string, (d: any) => string> = {
       'business.create': (d) =>
         `${userName} created business "${d?.businessName || businessName}"`,
-      'business.update': () =>
-        `${userName} updated business "${businessName}"`,
+      'business.update': () => `${userName} updated business "${businessName}"`,
       'business.status_update': (d) =>
         `${userName} changed status of "${businessName}" to ${d?.newStatus || d?.status || 'unknown'}`,
       'order.create': (d) =>
@@ -961,38 +1015,29 @@ export class AdminService {
         `${userName} cancelled order ${d?.orderNumber || ''}`,
       'payment.create': () =>
         `${userName} processed payment at "${businessName}"`,
-      'payment.refund': () =>
-        `${userName} issued refund at "${businessName}"`,
-      'payment.split': () =>
-        `${userName} split payment at "${businessName}"`,
+      'payment.refund': () => `${userName} issued refund at "${businessName}"`,
+      'payment.split': () => `${userName} split payment at "${businessName}"`,
       'team.invite': () =>
         `${userName} invited team member to "${businessName}"`,
       'team.remove': () =>
         `${userName} removed team member from "${businessName}"`,
       'team.update_role': () =>
         `${userName} updated a team member's role at "${businessName}"`,
-      'menu.create': () =>
-        `${userName} added menu item at "${businessName}"`,
-      'menu.update': () =>
-        `${userName} updated menu at "${businessName}"`,
+      'menu.create': () => `${userName} added menu item at "${businessName}"`,
+      'menu.update': () => `${userName} updated menu at "${businessName}"`,
       'inventory.create': () =>
         `${userName} added inventory item at "${businessName}"`,
       'inventory.adjust': () =>
         `${userName} adjusted stock at "${businessName}"`,
-      'expense.create': () =>
-        `${userName} logged expense at "${businessName}"`,
+      'expense.create': () => `${userName} logged expense at "${businessName}"`,
       'expense.approve': () =>
         `${userName} approved expense at "${businessName}"`,
-      'table.create': () =>
-        `${userName} added table at "${businessName}"`,
-      'subscription.cancel': () =>
-        `${userName} cancelled subscription`,
+      'table.create': () => `${userName} added table at "${businessName}"`,
+      'subscription.cancel': () => `${userName} cancelled subscription`,
       'subscription.extend_trial': (d) =>
         `${userName} extended trial by ${d?.days || '?'} days`,
-      'admin.ban_user': (d) =>
-        `Admin banned user ${d?.targetEmail || ''}`,
-      'admin.unban_user': (d) =>
-        `Admin unbanned user ${d?.targetEmail || ''}`,
+      'admin.ban_user': (d) => `Admin banned user ${d?.targetEmail || ''}`,
+      'admin.unban_user': (d) => `Admin unbanned user ${d?.targetEmail || ''}`,
       'admin.update_role': (d) =>
         `Admin changed role for ${d?.targetEmail || ''} to ${d?.newRole || ''}`,
     };
@@ -1091,7 +1136,9 @@ export class AdminService {
     }
 
     if (event.status !== 'failed') {
-      throw new BadRequestException('Only failed webhook events can be retried');
+      throw new BadRequestException(
+        'Only failed webhook events can be retried',
+      );
     }
 
     const updated = await this.prisma.webhookEvent.update({
@@ -1103,7 +1150,9 @@ export class AdminService {
       },
     });
 
-    this.logger.log(`Webhook event ${id} marked for retry (attempt ${updated.retryCount})`);
+    this.logger.log(
+      `Webhook event ${id} marked for retry (attempt ${updated.retryCount})`,
+    );
 
     return updated;
   }
@@ -1134,7 +1183,9 @@ export class AdminService {
           processed++;
         } catch (error) {
           failed++;
-          this.logger.warn(`Bulk user action failed for user ${userId}: ${error}`);
+          this.logger.warn(
+            `Bulk user action failed for user ${userId}: ${error}`,
+          );
         }
       }
     });
@@ -1153,7 +1204,8 @@ export class AdminService {
     let processed = 0;
     let failed = 0;
 
-    const status = dto.action === BulkBusinessAction.SUSPEND ? 'suspended' : 'active';
+    const status =
+      dto.action === BulkBusinessAction.SUSPEND ? 'suspended' : 'active';
 
     await this.prisma.$transaction(async (tx) => {
       for (const businessId of dto.ids) {
@@ -1165,7 +1217,9 @@ export class AdminService {
           processed++;
         } catch (error) {
           failed++;
-          this.logger.warn(`Bulk business action failed for business ${businessId}: ${error}`);
+          this.logger.warn(
+            `Bulk business action failed for business ${businessId}: ${error}`,
+          );
         }
       }
     });
@@ -1196,7 +1250,9 @@ export class AdminService {
           processed++;
         } catch (error) {
           failed++;
-          this.logger.warn(`Bulk subscription action failed for subscription ${subscriptionId}: ${error}`);
+          this.logger.warn(
+            `Bulk subscription action failed for subscription ${subscriptionId}: ${error}`,
+          );
         }
       }
     });
@@ -1258,7 +1314,9 @@ export class AdminService {
       where: { name: dto.name },
     });
     if (existingName) {
-      throw new BadRequestException(`A plan with name "${dto.name}" already exists`);
+      throw new BadRequestException(
+        `A plan with name "${dto.name}" already exists`,
+      );
     }
 
     // Validate unique slug
@@ -1266,7 +1324,9 @@ export class AdminService {
       where: { slug: dto.slug },
     });
     if (existingSlug) {
-      throw new BadRequestException(`A plan with slug "${dto.slug}" already exists`);
+      throw new BadRequestException(
+        `A plan with slug "${dto.slug}" already exists`,
+      );
     }
 
     const plan = await this.prisma.subscriptionPlan.create({
@@ -1330,7 +1390,9 @@ export class AdminService {
         where: { name: dto.name },
       });
       if (existingName) {
-        throw new BadRequestException(`A plan with name "${dto.name}" already exists`);
+        throw new BadRequestException(
+          `A plan with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -1340,7 +1402,9 @@ export class AdminService {
         where: { slug: dto.slug },
       });
       if (existingSlug) {
-        throw new BadRequestException(`A plan with slug "${dto.slug}" already exists`);
+        throw new BadRequestException(
+          `A plan with slug "${dto.slug}" already exists`,
+        );
       }
     }
 
@@ -1351,14 +1415,24 @@ export class AdminService {
         ...(dto.slug !== undefined && { slug: dto.slug }),
         ...(dto.displayName !== undefined && { displayName: dto.displayName }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.priceMonthly !== undefined && { priceMonthly: dto.priceMonthly }),
+        ...(dto.priceMonthly !== undefined && {
+          priceMonthly: dto.priceMonthly,
+        }),
         ...(dto.priceYearly !== undefined && { priceYearly: dto.priceYearly }),
         ...(dto.currency !== undefined && { currency: dto.currency }),
-        ...(dto.maxLocations !== undefined && { maxLocations: dto.maxLocations }),
-        ...(dto.maxTeamMembers !== undefined && { maxTeamMembers: dto.maxTeamMembers }),
-        ...(dto.maxOrdersPerMonth !== undefined && { maxOrdersPerMonth: dto.maxOrdersPerMonth }),
+        ...(dto.maxLocations !== undefined && {
+          maxLocations: dto.maxLocations,
+        }),
+        ...(dto.maxTeamMembers !== undefined && {
+          maxTeamMembers: dto.maxTeamMembers,
+        }),
+        ...(dto.maxOrdersPerMonth !== undefined && {
+          maxOrdersPerMonth: dto.maxOrdersPerMonth,
+        }),
         ...(dto.features !== undefined && { features: dto.features }),
-        ...(dto.dodoProductId !== undefined && { dodoProductId: dto.dodoProductId }),
+        ...(dto.dodoProductId !== undefined && {
+          dodoProductId: dto.dodoProductId,
+        }),
         ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
         ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
       },
@@ -1395,7 +1469,9 @@ export class AdminService {
       },
     });
 
-    this.logger.log(`Plan "${updated.name}" (${updated.id}) status changed to ${newStatus}`);
+    this.logger.log(
+      `Plan "${updated.name}" (${updated.id}) status changed to ${newStatus}`,
+    );
 
     return updated;
   }
@@ -1407,7 +1483,10 @@ export class AdminService {
     adminSessionId: string,
     targetUserId: string,
     context?: { ipAddress?: string; userAgent?: string },
-  ): Promise<{ sessionToken: string; targetUser: { id: string; name: string | null; email: string } }> {
+  ): Promise<{
+    sessionToken: string;
+    targetUser: { id: string; name: string | null; email: string };
+  }> {
     // Verify target user exists
     const targetUser = await this.prisma.user.findUnique({
       where: { id: targetUserId },
@@ -1424,12 +1503,15 @@ export class AdminService {
     }
 
     // Check if admin already has an active impersonation session
-    const existingImpersonation = await this.prisma.impersonationSession.findUnique({
-      where: { adminSessionId },
-    });
+    const existingImpersonation =
+      await this.prisma.impersonationSession.findUnique({
+        where: { adminSessionId },
+      });
 
     if (existingImpersonation) {
-      throw new BadRequestException('You already have an active impersonation session. Stop it first.');
+      throw new BadRequestException(
+        'You already have an active impersonation session. Stop it first.',
+      );
     }
 
     // Generate a new session token and session ID for the impersonated session
