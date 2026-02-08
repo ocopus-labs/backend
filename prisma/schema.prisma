@@ -41,6 +41,7 @@ model Restaurant {
   stockTransactions StockTransaction[]
   tables            Table[]
   usageRecords      UsageRecord[]
+  apiKeys           ApiKey[]
 
   @@index([ownerId])
   @@index([slug])
@@ -76,6 +77,7 @@ model User {
   twoFactorEntries   TwoFactor[]
   announcements      Announcement[]
   announcementDismissals AnnouncementDismissal[]
+  apiKeys            ApiKey[]
 
   @@index([email])
   @@map("users")
@@ -708,4 +710,31 @@ model ImpersonationSession {
   @@index([adminUserId])
   @@index([impSessionId])
   @@map("impersonation_sessions")
+}
+
+// ==================== API KEY MODELS ====================
+
+model ApiKey {
+  id           String    @id @default(uuid())
+  name         String
+  keyPrefix    String    @unique @map("key_prefix")
+  keyHash      String    @unique @map("key_hash")
+  userId       String    @map("user_id")
+  restaurantId String    @map("restaurant_id")
+  permissions  String[]  @default([])
+  scopes       String[]  @default([])
+  lastUsedAt   DateTime? @map("last_used_at")
+  expiresAt    DateTime? @map("expires_at")
+  isActive     Boolean   @default(true) @map("is_active")
+  rateLimit    Int       @default(60) @map("rate_limit")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([userId])
+  @@index([restaurantId])
+  @@map("api_keys")
 }

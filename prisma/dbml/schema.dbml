@@ -32,6 +32,7 @@ Table restaurants {
   stockTransactions stock_transactions [not null]
   tables tables [not null]
   usageRecords usage_records [not null]
+  apiKeys api_keys [not null]
 }
 
 Table users {
@@ -60,6 +61,7 @@ Table users {
   twoFactorEntries two_factor [not null]
   announcements announcements [not null]
   announcementDismissals announcement_dismissals [not null]
+  apiKeys api_keys [not null]
 }
 
 Table business_users {
@@ -479,6 +481,25 @@ Table impersonation_sessions {
   expiresAt DateTime [not null]
 }
 
+Table api_keys {
+  id String [pk]
+  name String [not null]
+  keyPrefix String [unique, not null]
+  keyHash String [unique, not null]
+  userId String [not null]
+  restaurantId String [not null]
+  permissions String[] [not null]
+  scopes String[] [not null]
+  lastUsedAt DateTime
+  expiresAt DateTime
+  isActive Boolean [not null, default: true]
+  rateLimit Int [not null, default: 60]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  restaurant restaurants [not null]
+}
+
 Enum UserRole {
   OWNER
   MANAGER
@@ -620,3 +641,7 @@ Ref: announcements.createdBy > users.id
 Ref: announcement_dismissals.announcementId > announcements.id [delete: Cascade]
 
 Ref: announcement_dismissals.userId > users.id [delete: Cascade]
+
+Ref: api_keys.userId > users.id [delete: Cascade]
+
+Ref: api_keys.restaurantId > restaurants.id [delete: Cascade]
