@@ -27,6 +27,8 @@ import { LoyaltyModule } from './modules/loyalty';
 import { SearchModule } from './modules/search';
 import { McpModule } from './modules/mcp';
 import { TaxModule } from './modules/tax';
+import { QrModule } from './modules/qr';
+import { CustomerOrderModule } from './modules/customer-order';
 
 @Module({
   imports: [
@@ -78,6 +80,8 @@ import { TaxModule } from './modules/tax';
     SearchModule,
     McpModule,
     TaxModule,
+    QrModule,
+    CustomerOrderModule,
   ],
   controllers: [AppController],
   providers: [
