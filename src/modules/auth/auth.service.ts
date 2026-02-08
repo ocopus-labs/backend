@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { AuthService as BetterAuthService } from '@thallesp/nestjs-better-auth';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthConfig } from 'src/lib/auth/auth.config';
@@ -398,6 +399,24 @@ export class AuthService {
     } catch (error) {
       this.logger.error(`Error updating preferences: ${error}`);
       throw new InternalServerErrorException('Failed to update preferences');
+    }
+  }
+
+  /**
+   * Purge expired sessions from the database (runs daily at 3 AM)
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async cleanupExpiredSessions(): Promise<void> {
+    try {
+      const result = await this.prisma.session.deleteMany({
+        where: { expiresAt: { lt: new Date() } },
+      });
+
+      if (result.count > 0) {
+        this.logger.log(`Cleaned up ${result.count} expired sessions`);
+      }
+    } catch (error) {
+      this.logger.error(`Session cleanup failed: ${error}`);
     }
   }
 }
