@@ -19,6 +19,9 @@ import { OrderGateway } from './order.gateway';
 import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
 import { TableService } from 'src/modules/table/table.service';
 import { LoyaltyService } from 'src/modules/loyalty/loyalty.service';
+import { TaxService } from 'src/modules/tax/tax.service';
+import { calculateTaxForOrder } from 'src/modules/tax/utils/tax-calculator';
+import type { TaxBreakdown } from 'src/modules/tax/interfaces';
 
 @Injectable()
 export class OrderService {
@@ -30,6 +33,7 @@ export class OrderService {
     private readonly usageTrackingService: UsageTrackingService,
     private readonly tableService: TableService,
     private readonly loyaltyService: LoyaltyService,
+    private readonly taxService: TaxService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -63,9 +67,15 @@ export class OrderService {
     taxRate: number = 0,
     discount?: { type: 'percentage' | 'fixed'; value: number },
     serviceCharge: number = 0,
+    taxBreakdown?: TaxBreakdown,
   ): OrderPricing {
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const taxAmount = (subtotal * taxRate) / 100;
+
+    // Use tax breakdown total if available, otherwise fall back to flat rate
+    const taxAmount = taxBreakdown ? taxBreakdown.totalTax : (subtotal * taxRate) / 100;
+    const effectiveRate = taxBreakdown && subtotal > 0
+      ? Math.round((taxAmount / subtotal) * 10000) / 100
+      : taxRate;
 
     let discountAmount = 0;
     if (discount) {
@@ -79,13 +89,14 @@ export class OrderService {
 
     return {
       subtotal,
-      taxRate,
+      taxRate: effectiveRate,
       taxAmount,
       discountType: discount?.type,
       discountValue: discount?.value,
       discountAmount,
       serviceCharge,
       total,
+      ...(taxBreakdown && { taxBreakdown }),
     };
   }
 
@@ -120,12 +131,45 @@ export class OrderService {
       status: 'pending' as const,
     }));
 
+    // Calculate tax breakdown if tax regime is enabled
+    let taxBreakdown: TaxBreakdown | undefined;
+    try {
+      const taxSettings = await this.taxService.getSettings(businessId);
+      if (taxSettings.enabled) {
+        // Look up menu items to get their tax codes/categories
+        const menuData = await this.prisma.menuItem.findFirst({
+          where: { restaurantId: businessId },
+          select: { categories: true },
+        });
+        const allMenuItems = menuData
+          ? ((menuData.categories as any[]) || []).flatMap((cat: any) => cat.items || [])
+          : [];
+
+        const taxableItems = orderItems.map((item) => {
+          const menuItem = allMenuItems.find((mi: any) => mi.id === item.menuItemId);
+          return {
+            id: item.id,
+            name: item.name,
+            taxCode: menuItem?.taxCode,
+            taxCategory: menuItem?.taxCategory,
+            customTaxRate: menuItem?.customTaxRate,
+            taxableValue: item.totalPrice,
+          };
+        });
+
+        taxBreakdown = calculateTaxForOrder(taxableItems, taxSettings);
+      }
+    } catch (err) {
+      this.logger.warn(`Tax calculation skipped: ${err}`);
+    }
+
     // Calculate pricing
     const pricing = this.calculatePricing(
       orderItems,
       dto.taxRate,
       dto.discount,
       dto.serviceCharge,
+      taxBreakdown,
     );
 
     // Build timestamps

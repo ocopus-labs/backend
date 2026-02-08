@@ -24,7 +24,7 @@ import {
   UpdateItemQuantityDto,
   ApplyDiscountDto,
 } from './dto';
-import { BusinessRoles, generateCsv } from 'src/lib/common';
+import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 
 interface UserSession {
@@ -37,6 +37,7 @@ interface UserSession {
 
 @Controller('business/:businessId/orders')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 

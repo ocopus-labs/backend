@@ -31,6 +31,9 @@ export interface OrderItem {
     removals?: string[];
     specialInstructions?: string;
   };
+  taxCode?: string;
+  taxCategory?: string;
+  taxRate?: number;
   status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
 }
 
@@ -43,6 +46,7 @@ export interface OrderPricing {
   discountAmount: number;
   serviceCharge?: number;
   total: number;
+  taxBreakdown?: import('src/modules/tax/interfaces').TaxBreakdown;
 }
 
 export interface OrderTimestamps {
