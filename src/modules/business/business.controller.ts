@@ -23,6 +23,7 @@ import {
   UpdateBusinessLogoDto,
 } from './dto';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
+import { Sanitize } from 'src/lib/common';
 import { BUSINESS_TYPES, BUSINESS_TYPE_CONFIG } from './config/business-types.config';
 
 interface UserSession {
@@ -36,6 +37,7 @@ interface UserSession {
 
 @Controller('business')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class BusinessController {
   private readonly logger = new Logger(BusinessController.name);
 
