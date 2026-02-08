@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { randomUUID } from 'crypto';
@@ -15,10 +15,16 @@ import type {
   Receipt,
   PaymentSummary,
 } from './interfaces';
+import { TaxService } from 'src/modules/tax';
 
 @Injectable()
 export class PaymentService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(PaymentService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly taxService: TaxService,
+  ) {}
 
   private generatePaymentNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -76,7 +82,7 @@ export class PaymentService {
     }
 
     const paymentNumber = this.generatePaymentNumber();
-    const pricing = order.pricing as { subtotal: number; taxRate: number; taxAmount: number; total: number };
+    const pricing = order.pricing as { subtotal: number; taxRate: number; taxAmount: number; total: number; taxBreakdown?: { regime: string; componentTotals: Record<string, number>; totalTax: number } };
 
     // Calculate change for cash payments
     let change = 0;
@@ -93,6 +99,13 @@ export class PaymentService {
       taxRate: pricing.taxRate,
       taxAmount: pricing.taxAmount,
       total: pricing.total,
+      ...(pricing.taxBreakdown && {
+        taxBreakdown: {
+          regime: pricing.taxBreakdown.regime,
+          componentTotals: pricing.taxBreakdown.componentTotals,
+          totalTax: pricing.taxBreakdown.totalTax,
+        },
+      }),
     };
 
     // Create payment, update order, and audit log atomically
@@ -127,11 +140,23 @@ export class PaymentService {
         },
       });
 
+      // Generate invoice number when order is fully paid (if tax is enabled)
+      let invoiceNumber: string | undefined;
+      if (newPaymentStatus === 'paid') {
+        try {
+          invoiceNumber = await this.taxService.generateInvoiceNumber(businessId);
+        } catch (err) {
+          // Tax not enabled or invoice generation failed — skip silently
+          this.logger.debug(`Invoice number generation skipped: ${(err as Error).message}`);
+        }
+      }
+
       const updatedOrder = await tx.order.update({
         where: { id: dto.orderId },
         data: {
           balanceDue: newBalance,
           paymentStatus: newPaymentStatus,
+          ...(invoiceNumber && { invoiceNumber }),
         },
       });
 
@@ -147,6 +172,7 @@ export class PaymentService {
           method: dto.method,
           newPaymentStatus,
           remainingBalance: newBalance,
+          ...(invoiceNumber && { invoiceNumber }),
         },
       });
       await tx.order.update({
@@ -167,6 +193,7 @@ export class PaymentService {
             amount: dto.amount,
             method: dto.method,
             change,
+            ...(invoiceNumber && { invoiceNumber }),
           } as object,
           ipAddress: context?.ipAddress,
           userAgent: context?.userAgent,

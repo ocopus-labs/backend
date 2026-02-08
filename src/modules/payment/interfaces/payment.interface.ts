@@ -20,6 +20,11 @@ export interface TaxDetails {
   taxRate: number;
   taxAmount: number;
   total: number;
+  taxBreakdown?: {
+    regime: string;
+    componentTotals: Record<string, number>;
+    totalTax: number;
+  };
 }
 
 export interface RefundEntry {
