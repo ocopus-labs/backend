@@ -24,6 +24,7 @@ import { SubscriptionGuard } from './guards/subscription.guard';
     PlanService,
     UsageTrackingService,
     SubscriptionGuard,
+    DodoService,
   ],
 })
 export class SubscriptionModule {}
