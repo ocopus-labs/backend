@@ -102,8 +102,8 @@ export class OrderService {
 
   async createOrder(
     businessId: string,
-    staffId: string,
-    staffName: string,
+    staffId: string | null,
+    staffName: string | null,
     dto: CreateOrderDto,
     context?: { ipAddress?: string; userAgent?: string },
   ) {
@@ -194,7 +194,7 @@ export class OrderService {
     const auditTrail: OrderAuditEntry[] = [
       {
         action: 'order.create',
-        performedBy: staffId,
+        performedBy: staffId || 'customer',
         performedAt: now,
         details: { orderType: dto.orderType, itemCount: orderItems.length },
       },
@@ -238,7 +238,7 @@ export class OrderService {
       await tx.auditLog.create({
         data: {
           restaurantId: businessId,
-          userId: staffId,
+          userId: staffId || null,
           action: 'order.create',
           resource: 'order',
           resourceId: created.id,
