@@ -12,7 +12,7 @@ import {
 import { Session } from '@thallesp/nestjs-better-auth';
 import { AnalyticsService } from './analytics.service';
 import { GenerateDailyReportDto } from './dto';
-import { BusinessRoles } from 'src/lib/common';
+import { BusinessRoles, HttpCacheTTL } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { ReportPeriod } from './interfaces';
 
@@ -33,6 +33,7 @@ export class AnalyticsController {
   constructor(private analyticsService: AnalyticsService) {}
 
   @Get('dashboard')
+  @HttpCacheTTL(30) // Dashboard stats cache 30s
   async getDashboardStats(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -144,6 +145,7 @@ export class AnalyticsController {
   }
 
   @Get('daily/:date')
+  @HttpCacheTTL(600) // Daily analytics are pre-computed, cache 10 min
   async getDailyAnalytics(
     @Param('businessId') businessId: string,
     @Param('date') dateStr: string,

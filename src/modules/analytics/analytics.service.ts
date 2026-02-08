@@ -13,6 +13,9 @@ import {
   CustomerInsights,
 } from './interfaces';
 
+/** Max rows to load for in-memory aggregation of order items (JSON column). */
+const MAX_ANALYTICS_ROWS = 10_000;
+
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
@@ -21,6 +24,7 @@ export class AnalyticsService {
 
   /**
    * Get dashboard statistics for quick overview
+   * Optimized: uses count/aggregate instead of loading full objects
    */
   async getDashboardStats(restaurantId: string): Promise<DashboardStats> {
     const today = new Date();
@@ -29,90 +33,90 @@ export class AnalyticsService {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    // Today's orders
-    const todayOrders = await this.prisma.order.findMany({
-      where: {
-        restaurantId,
-        createdAt: { gte: today },
-        status: { not: 'cancelled' },
-      },
-      include: {
-        payments: true,
-      },
-    });
+    const baseWhere = {
+      restaurantId,
+      status: { not: 'cancelled' } as const,
+    };
 
-    // Yesterday's orders for comparison
-    const yesterdayOrders = await this.prisma.order.findMany({
-      where: {
-        restaurantId,
-        createdAt: { gte: yesterday, lt: today },
-        status: { not: 'cancelled' },
-      },
-    });
+    // Parallel: aggregate today + yesterday + counts (no full object loads)
+    const [
+      todayAgg,
+      todayCount,
+      yesterdayAgg,
+      yesterdayCount,
+      paymentMethodCounts,
+      pendingOrders,
+      activeTables,
+      lowStockItems,
+    ] = await Promise.all([
+      // Today's revenue via select + limited fields
+      this.prisma.order.findMany({
+        where: { ...baseWhere, createdAt: { gte: today } },
+        select: { pricing: true },
+      }),
+      this.prisma.order.count({
+        where: { ...baseWhere, createdAt: { gte: today } },
+      }),
+      // Yesterday's revenue
+      this.prisma.order.findMany({
+        where: { ...baseWhere, createdAt: { gte: yesterday, lt: today } },
+        select: { pricing: true },
+      }),
+      this.prisma.order.count({
+        where: { ...baseWhere, createdAt: { gte: yesterday, lt: today } },
+      }),
+      // Payment method counts via groupBy (no N+1)
+      this.prisma.payment.groupBy({
+        by: ['method'],
+        where: {
+          restaurantId,
+          createdAt: { gte: today },
+          status: 'completed',
+        },
+        _count: { method: true },
+        orderBy: { _count: { method: 'desc' } },
+        take: 1,
+      }),
+      this.prisma.order.count({
+        where: {
+          restaurantId,
+          status: 'active',
+          paymentStatus: { in: ['pending', 'partial'] },
+        },
+      }),
+      this.prisma.table.count({
+        where: { restaurantId, status: 'occupied' },
+      }),
+      this.prisma.inventoryItem.count({
+        where: {
+          restaurantId,
+          isActive: true,
+          status: { in: ['low_stock', 'out_of_stock'] },
+        },
+      }),
+    ]);
 
-    // Calculate today's stats
-    const todayRevenue = todayOrders.reduce((sum, order) => {
-      const pricing = order.pricing as { total?: number };
+    const todayRevenue = todayAgg.reduce((sum, o) => {
+      const pricing = o.pricing as { total?: number };
       return sum + (pricing?.total || 0);
     }, 0);
 
-    const yesterdayRevenue = yesterdayOrders.reduce((sum, order) => {
-      const pricing = order.pricing as { total?: number };
+    const yesterdayRevenue = yesterdayAgg.reduce((sum, o) => {
+      const pricing = o.pricing as { total?: number };
       return sum + (pricing?.total || 0);
     }, 0);
 
-    const todayOrderCount = todayOrders.length;
-    const yesterdayOrderCount = yesterdayOrders.length;
+    const todayAOV = todayCount > 0 ? todayRevenue / todayCount : 0;
+    const yesterdayAOV = yesterdayCount > 0 ? yesterdayRevenue / yesterdayCount : 0;
 
-    const todayAOV = todayOrderCount > 0 ? todayRevenue / todayOrderCount : 0;
-    const yesterdayAOV = yesterdayOrderCount > 0 ? yesterdayRevenue / yesterdayOrderCount : 0;
+    const topPaymentMethod = paymentMethodCounts[0]?.method || 'cash';
 
-    // Payment method breakdown for today
-    const paymentMethods: Record<string, number> = {};
-    for (const order of todayOrders) {
-      for (const payment of order.payments) {
-        paymentMethods[payment.method] = (paymentMethods[payment.method] || 0) + 1;
-      }
-    }
-
-    const topPaymentMethod = Object.entries(paymentMethods)
-      .sort(([, a], [, b]) => b - a)[0]?.[0] || 'cash';
-
-    // Pending orders
-    const pendingOrders = await this.prisma.order.count({
-      where: {
-        restaurantId,
-        status: 'active',
-        paymentStatus: { in: ['pending', 'partial'] },
-      },
-    });
-
-    // Active tables
-    const activeTables = await this.prisma.table.count({
-      where: {
-        restaurantId,
-        status: 'occupied',
-      },
-    });
-
-    // Low stock items
-    const lowStockItems = await this.prisma.inventoryItem.count({
-      where: {
-        restaurantId,
-        isActive: true,
-        status: { in: ['low_stock', 'out_of_stock'] },
-      },
-    });
-
-    // Calculate percentage changes
     const revenueChange = yesterdayRevenue > 0
       ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
       : 0;
-
-    const ordersChange = yesterdayOrderCount > 0
-      ? ((todayOrderCount - yesterdayOrderCount) / yesterdayOrderCount) * 100
+    const ordersChange = yesterdayCount > 0
+      ? ((todayCount - yesterdayCount) / yesterdayCount) * 100
       : 0;
-
     const aovChange = yesterdayAOV > 0
       ? ((todayAOV - yesterdayAOV) / yesterdayAOV) * 100
       : 0;
@@ -120,7 +124,7 @@ export class AnalyticsService {
     return {
       today: {
         revenue: todayRevenue,
-        orders: todayOrderCount,
+        orders: todayCount,
         averageOrderValue: todayAOV,
         topPaymentMethod,
       },
@@ -129,7 +133,7 @@ export class AnalyticsService {
         ordersChange: Math.round(ordersChange * 100) / 100,
         aovChange: Math.round(aovChange * 100) / 100,
       },
-      recentOrders: todayOrderCount,
+      recentOrders: todayCount,
       pendingOrders,
       activeTableCount: activeTables,
       lowStockItems,
@@ -138,6 +142,7 @@ export class AnalyticsService {
 
   /**
    * Get sales summary for a date range
+   * Optimized: select only pricing column
    */
   async getSalesSummary(
     restaurantId: string,
@@ -150,6 +155,8 @@ export class AnalyticsService {
         createdAt: { gte: startDate, lte: endDate },
         status: { not: 'cancelled' },
       },
+      select: { pricing: true },
+      take: MAX_ANALYTICS_ROWS,
     });
 
     let totalRevenue = 0;
@@ -161,9 +168,7 @@ export class AnalyticsService {
         total?: number;
         tax?: number;
         discount?: number;
-        subtotal?: number;
       };
-
       totalRevenue += pricing?.total || 0;
       totalTax += pricing?.tax || 0;
       totalDiscount += pricing?.discount || 0;
@@ -185,47 +190,45 @@ export class AnalyticsService {
 
   /**
    * Get payment method breakdown
+   * Optimized: use groupBy aggregation instead of loading all payment rows
    */
   async getPaymentMethodBreakdown(
     restaurantId: string,
     startDate: Date,
     endDate: Date,
   ): Promise<PaymentMethodBreakdown[]> {
-    const payments = await this.prisma.payment.findMany({
+    const grouped = await this.prisma.payment.groupBy({
+      by: ['method'],
       where: {
         restaurantId,
         createdAt: { gte: startDate, lte: endDate },
         status: 'completed',
       },
+      _count: { method: true },
+      _sum: { amount: true },
     });
 
-    const methodMap = new Map<string, { count: number; amount: number }>();
-
-    for (const payment of payments) {
-      const current = methodMap.get(payment.method) || { count: 0, amount: 0 };
-      methodMap.set(payment.method, {
-        count: current.count + 1,
-        amount: current.amount + Number(payment.amount),
-      });
-    }
-
-    const totalAmount = Array.from(methodMap.values()).reduce(
-      (sum, { amount }) => sum + amount,
+    const totalAmount = grouped.reduce(
+      (sum, g) => sum + Number(g._sum.amount || 0),
       0,
     );
 
-    return Array.from(methodMap.entries())
-      .map(([method, { count, amount }]) => ({
-        method,
-        count,
-        amount: Math.round(amount * 100) / 100,
-        percentage: totalAmount > 0 ? Math.round((amount / totalAmount) * 10000) / 100 : 0,
-      }))
+    return grouped
+      .map((g) => {
+        const amount = Number(g._sum.amount || 0);
+        return {
+          method: g.method,
+          count: g._count.method,
+          amount: Math.round(amount * 100) / 100,
+          percentage: totalAmount > 0 ? Math.round((amount / totalAmount) * 10000) / 100 : 0,
+        };
+      })
       .sort((a, b) => b.amount - a.amount);
   }
 
   /**
    * Get top selling items
+   * Optimized: select only items column, apply take limit
    */
   async getTopSellingItems(
     restaurantId: string,
@@ -239,6 +242,8 @@ export class AnalyticsService {
         createdAt: { gte: startDate, lte: endDate },
         status: { not: 'cancelled' },
       },
+      select: { items: true },
+      take: MAX_ANALYTICS_ROWS,
     });
 
     const itemMap = new Map<string, TopSellingItem>();
@@ -281,6 +286,7 @@ export class AnalyticsService {
 
   /**
    * Get hourly breakdown for a specific date
+   * Optimized: select only createdAt + pricing
    */
   async getHourlyBreakdown(
     restaurantId: string,
@@ -298,6 +304,7 @@ export class AnalyticsService {
         createdAt: { gte: startOfDay, lte: endOfDay },
         status: { not: 'cancelled' },
       },
+      select: { createdAt: true, pricing: true },
     });
 
     const hourlyData = new Array(24).fill(null).map((_, hour) => ({
@@ -322,6 +329,7 @@ export class AnalyticsService {
 
   /**
    * Get staff performance
+   * Optimized: select only staffId, staffName, pricing
    */
   async getStaffPerformance(
     restaurantId: string,
@@ -334,6 +342,8 @@ export class AnalyticsService {
         createdAt: { gte: startDate, lte: endDate },
         status: { not: 'cancelled' },
       },
+      select: { staffId: true, staffName: true, pricing: true },
+      take: MAX_ANALYTICS_ROWS,
     });
 
     const staffMap = new Map<string, StaffPerformance>();
@@ -371,6 +381,7 @@ export class AnalyticsService {
 
   /**
    * Get full date range report
+   * Optimized: daily trend uses select + take limit
    */
   async getDateRangeReport(
     restaurantId: string,
@@ -385,14 +396,16 @@ export class AnalyticsService {
         this.getStaffPerformance(restaurantId, startDate, endDate),
       ]);
 
-    // Get daily trend
+    // Daily trend: select only needed fields
     const orders = await this.prisma.order.findMany({
       where: {
         restaurantId,
         createdAt: { gte: startDate, lte: endDate },
         status: { not: 'cancelled' },
       },
+      select: { createdAt: true, pricing: true },
       orderBy: { createdAt: 'asc' },
+      take: MAX_ANALYTICS_ROWS,
     });
 
     const dailyMap = new Map<string, { revenue: number; orders: number }>();
@@ -455,7 +468,7 @@ export class AnalyticsService {
         this.getStaffPerformance(restaurantId, startOfDay, endOfDay),
       ]);
 
-    // Get table performance
+    // Table performance: select only needed fields
     const orders = await this.prisma.order.findMany({
       where: {
         restaurantId,
@@ -463,7 +476,12 @@ export class AnalyticsService {
         status: { not: 'cancelled' },
         tableId: { not: null },
       },
-      include: { table: true },
+      select: {
+        tableId: true,
+        tableNumber: true,
+        pricing: true,
+        table: { select: { tableNumber: true } },
+      },
     });
 
     const tableMap = new Map<string, { orders: number; revenue: number; tableNumber: string }>();
