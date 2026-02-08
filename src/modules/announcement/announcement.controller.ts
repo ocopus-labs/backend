@@ -18,6 +18,7 @@ import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { AnnouncementService } from './announcement.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
+import { Sanitize } from 'src/lib/common';
 
 interface UserSession {
   user: {
@@ -33,6 +34,7 @@ interface UserSession {
 @Controller('admin/announcements')
 @UsePipes(new ValidationPipe({ transform: true }))
 @Roles([USER_ROLES.SUPER_ADMIN])
+@Sanitize()
 export class AdminAnnouncementController {
   constructor(private announcementService: AnnouncementService) {}
 
@@ -100,6 +102,7 @@ export class AdminAnnouncementController {
 
 @Controller('announcements')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class UserAnnouncementController {
   constructor(private announcementService: AnnouncementService) {}
 
