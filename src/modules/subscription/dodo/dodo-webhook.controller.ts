@@ -279,10 +279,16 @@ export class DodoWebhookController {
    * Handle payment.succeeded event
    */
   private async handlePaymentSucceeded(data: DodoWebhookPayload['data']) {
-    const { subscription_id, created_at, expires_at } = data;
+    const { subscription_id, created_at, expires_at, metadata, payment_id } = data;
+
+    // Check if this is a customer order payment (not a subscription)
+    if (metadata?.payment_type === 'customer_order') {
+      await this.handleOrderPaymentSucceeded(metadata, payment_id);
+      return;
+    }
 
     if (!subscription_id) {
-      // One-time payment, not a subscription
+      // One-time payment, not a subscription and not an order
       return;
     }
 
@@ -294,6 +300,74 @@ export class DodoWebhookController {
         new Date(expires_at),
       );
     }
+  }
+
+  /**
+   * Handle payment.succeeded for customer order payments
+   */
+  private async handleOrderPaymentSucceeded(
+    metadata: Record<string, string>,
+    paymentId?: string,
+  ) {
+    const { order_id, order_number, business_id } = metadata;
+
+    if (!order_id) {
+      this.logger.warn('Order payment webhook missing order_id in metadata');
+      return;
+    }
+
+    this.logger.log(`Processing order payment: order=${order_number}, dodoPayment=${paymentId}`);
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: order_id },
+    });
+
+    if (!order) {
+      this.logger.warn(`Order ${order_id} not found for Dodo payment webhook`);
+      return;
+    }
+
+    if (order.paymentStatus === 'paid') {
+      this.logger.debug(`Order ${order_id} already paid, skipping`);
+      return;
+    }
+
+    const pricing = order.pricing as Record<string, number>;
+    const orderTotal = pricing.total || 0;
+
+    const paymentNumber = `PAY-DODO-${Date.now().toString(36).toUpperCase()}`;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.create({
+        data: {
+          restaurantId: order.restaurantId,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          paymentNumber,
+          amount: orderTotal,
+          method: 'dodo',
+          status: 'completed',
+          gatewayTransactionId: paymentId || null,
+          customerInfo: {
+            source: 'dodo_checkout',
+            dodoPaymentId: paymentId,
+          } as object,
+          taxDetails: {} as object,
+          processedBy: null,
+          processedAt: new Date(),
+        },
+      });
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: 'paid',
+          balanceDue: 0,
+        },
+      });
+    });
+
+    this.logger.log(`Order ${order.orderNumber} marked as paid via Dodo (payment: ${paymentId})`);
   }
 
   /**

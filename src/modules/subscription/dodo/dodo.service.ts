@@ -171,4 +171,65 @@ export class DodoService {
   async getProduct(productId: string) {
     return this.client.products.retrieve(productId);
   }
+
+  /**
+   * Create a checkout session for a one-time order payment.
+   * Requires DODO_ORDER_PRODUCT_ID env var pointing to a PWYW product.
+   * Returns null if not configured.
+   */
+  async createOrderPaymentCheckout(params: {
+    orderId: string;
+    orderNumber: string;
+    trackingToken: string;
+    businessId: string;
+    amountInSmallestUnit: number; // paise for INR, cents for USD
+    customerName: string;
+    customerPhone: string;
+    returnUrl: string;
+  }) {
+    const productId = this.configService.get<string>('DODO_ORDER_PRODUCT_ID');
+    if (!productId) {
+      this.logger.warn('DODO_ORDER_PRODUCT_ID not configured — order payments via Dodo disabled');
+      return null;
+    }
+
+    this.logger.log(
+      `Creating order payment checkout for ${params.orderNumber} (${params.amountInSmallestUnit} smallest units)`,
+    );
+
+    const checkout = await this.client.checkoutSessions.create({
+      product_cart: [
+        {
+          product_id: productId,
+          quantity: 1,
+          amount: params.amountInSmallestUnit,
+        },
+      ],
+      customer: {
+        email: `order-${params.customerPhone.replace(/\D/g, '')}@pos.local`,
+        name: params.customerName,
+        phone_number: params.customerPhone,
+      },
+      return_url: params.returnUrl,
+      metadata: {
+        payment_type: 'customer_order',
+        order_id: params.orderId,
+        order_number: params.orderNumber,
+        tracking_token: params.trackingToken,
+        business_id: params.businessId,
+      },
+    });
+
+    return {
+      checkoutUrl: checkout.checkout_url,
+      sessionId: checkout.session_id,
+    };
+  }
+
+  /**
+   * Check if order payment via Dodo is configured
+   */
+  isOrderPaymentConfigured(): boolean {
+    return !!this.configService.get<string>('DODO_ORDER_PRODUCT_ID');
+  }
 }
