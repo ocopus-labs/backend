@@ -83,7 +83,14 @@ export interface DateRangeReport {
   staffPerformance: StaffPerformance[];
 }
 
-export type ReportPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
+export type ReportPeriod =
+  | 'today'
+  | 'yesterday'
+  | 'week'
+  | 'month'
+  | 'quarter'
+  | 'year'
+  | 'custom';
 
 export const REPORT_PERIODS: Record<string, ReportPeriod> = {
   TODAY: 'today',

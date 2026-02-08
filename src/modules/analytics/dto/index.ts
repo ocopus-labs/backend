@@ -1,1 +1,5 @@
-export { GetAnalyticsDto, GenerateDailyReportDto, ComparePeriodsDto } from './analytics.dto';
+export {
+  GetAnalyticsDto,
+  GenerateDailyReportDto,
+  ComparePeriodsDto,
+} from './analytics.dto';

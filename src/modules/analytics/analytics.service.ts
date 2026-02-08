@@ -107,19 +107,21 @@ export class AnalyticsService {
     }, 0);
 
     const todayAOV = todayCount > 0 ? todayRevenue / todayCount : 0;
-    const yesterdayAOV = yesterdayCount > 0 ? yesterdayRevenue / yesterdayCount : 0;
+    const yesterdayAOV =
+      yesterdayCount > 0 ? yesterdayRevenue / yesterdayCount : 0;
 
     const topPaymentMethod = paymentMethodCounts[0]?.method || 'cash';
 
-    const revenueChange = yesterdayRevenue > 0
-      ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
-      : 0;
-    const ordersChange = yesterdayCount > 0
-      ? ((todayCount - yesterdayCount) / yesterdayCount) * 100
-      : 0;
-    const aovChange = yesterdayAOV > 0
-      ? ((todayAOV - yesterdayAOV) / yesterdayAOV) * 100
-      : 0;
+    const revenueChange =
+      yesterdayRevenue > 0
+        ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
+        : 0;
+    const ordersChange =
+      yesterdayCount > 0
+        ? ((todayCount - yesterdayCount) / yesterdayCount) * 100
+        : 0;
+    const aovChange =
+      yesterdayAOV > 0 ? ((todayAOV - yesterdayAOV) / yesterdayAOV) * 100 : 0;
 
     return {
       today: {
@@ -220,7 +222,10 @@ export class AnalyticsService {
           method: g.method,
           count: g._count.method,
           amount: Math.round(amount * 100) / 100,
-          percentage: totalAmount > 0 ? Math.round((amount / totalAmount) * 10000) / 100 : 0,
+          percentage:
+            totalAmount > 0
+              ? Math.round((amount / totalAmount) * 10000) / 100
+              : 0,
         };
       })
       .sort((a, b) => b.amount - a.amount);
@@ -459,14 +464,19 @@ export class AnalyticsService {
       },
     });
 
-    const [salesSummary, paymentMethods, topItems, hourlyBreakdown, staffPerformance] =
-      await Promise.all([
-        this.getSalesSummary(restaurantId, startOfDay, endOfDay),
-        this.getPaymentMethodBreakdown(restaurantId, startOfDay, endOfDay),
-        this.getTopSellingItems(restaurantId, startOfDay, endOfDay, 20),
-        this.getHourlyBreakdown(restaurantId, date),
-        this.getStaffPerformance(restaurantId, startOfDay, endOfDay),
-      ]);
+    const [
+      salesSummary,
+      paymentMethods,
+      topItems,
+      hourlyBreakdown,
+      staffPerformance,
+    ] = await Promise.all([
+      this.getSalesSummary(restaurantId, startOfDay, endOfDay),
+      this.getPaymentMethodBreakdown(restaurantId, startOfDay, endOfDay),
+      this.getTopSellingItems(restaurantId, startOfDay, endOfDay, 20),
+      this.getHourlyBreakdown(restaurantId, date),
+      this.getStaffPerformance(restaurantId, startOfDay, endOfDay),
+    ]);
 
     // Table performance: select only needed fields
     const orders = await this.prisma.order.findMany({
@@ -484,7 +494,10 @@ export class AnalyticsService {
       },
     });
 
-    const tableMap = new Map<string, { orders: number; revenue: number; tableNumber: string }>();
+    const tableMap = new Map<
+      string,
+      { orders: number; revenue: number; tableNumber: string }
+    >();
     for (const order of orders) {
       if (!order.tableId) continue;
       const pricing = order.pricing as { total?: number };
@@ -498,13 +511,15 @@ export class AnalyticsService {
       tableMap.set(order.tableId, current);
     }
 
-    const tablePerformance = Array.from(tableMap.entries()).map(([tableId, data]) => ({
-      tableId,
-      tableNumber: data.tableNumber,
-      ordersServed: data.orders,
-      revenue: Math.round(data.revenue * 100) / 100,
-      averageTurnoverTime: 0,
-    }));
+    const tablePerformance = Array.from(tableMap.entries()).map(
+      ([tableId, data]) => ({
+        tableId,
+        tableNumber: data.tableNumber,
+        ordersServed: data.orders,
+        revenue: Math.round(data.revenue * 100) / 100,
+        averageTurnoverTime: 0,
+      }),
+    );
 
     // Customer insights
     const peakHours = hourlyBreakdown
@@ -567,12 +582,15 @@ export class AnalyticsService {
   /**
    * Helper to get date range from period
    */
-  getDateRangeFromPeriod(period: ReportPeriod): { startDate: Date; endDate: Date } {
+  getDateRangeFromPeriod(period: ReportPeriod): {
+    startDate: Date;
+    endDate: Date;
+  } {
     const now = new Date();
     const endDate = new Date(now);
     endDate.setHours(23, 59, 59, 999);
 
-    let startDate = new Date(now);
+    const startDate = new Date(now);
     startDate.setHours(0, 0, 0, 0);
 
     switch (period) {

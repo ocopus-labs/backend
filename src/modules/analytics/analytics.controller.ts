@@ -50,8 +50,16 @@ export class AnalyticsController {
     @Query('endDate') endDateStr: string | undefined,
     @Session() session: UserSession,
   ) {
-    const { startDate, endDate } = this.getDateRange(period, startDateStr, endDateStr);
-    const summary = await this.analyticsService.getSalesSummary(businessId, startDate, endDate);
+    const { startDate, endDate } = this.getDateRange(
+      period,
+      startDateStr,
+      endDateStr,
+    );
+    const summary = await this.analyticsService.getSalesSummary(
+      businessId,
+      startDate,
+      endDate,
+    );
 
     return { summary, period: { startDate, endDate } };
   }
@@ -64,7 +72,11 @@ export class AnalyticsController {
     @Query('endDate') endDateStr: string | undefined,
     @Session() session: UserSession,
   ) {
-    const { startDate, endDate } = this.getDateRange(period, startDateStr, endDateStr);
+    const { startDate, endDate } = this.getDateRange(
+      period,
+      startDateStr,
+      endDateStr,
+    );
     const breakdown = await this.analyticsService.getPaymentMethodBreakdown(
       businessId,
       startDate,
@@ -83,7 +95,11 @@ export class AnalyticsController {
     @Query('limit') limit: string | undefined,
     @Session() session: UserSession,
   ) {
-    const { startDate, endDate } = this.getDateRange(period, startDateStr, endDateStr);
+    const { startDate, endDate } = this.getDateRange(
+      period,
+      startDateStr,
+      endDateStr,
+    );
     const items = await this.analyticsService.getTopSellingItems(
       businessId,
       startDate,
@@ -101,13 +117,20 @@ export class AnalyticsController {
     @Session() session: UserSession,
   ) {
     const date = dateStr ? new Date(dateStr) : new Date();
-    const breakdown = await this.analyticsService.getHourlyBreakdown(businessId, date);
+    const breakdown = await this.analyticsService.getHourlyBreakdown(
+      businessId,
+      date,
+    );
 
     return { breakdown, date };
   }
 
   @Get('staff')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async getStaffPerformance(
     @Param('businessId') businessId: string,
     @Query('period') period: ReportPeriod | undefined,
@@ -115,7 +138,11 @@ export class AnalyticsController {
     @Query('endDate') endDateStr: string | undefined,
     @Session() session: UserSession,
   ) {
-    const { startDate, endDate } = this.getDateRange(period, startDateStr, endDateStr);
+    const { startDate, endDate } = this.getDateRange(
+      period,
+      startDateStr,
+      endDateStr,
+    );
     const performance = await this.analyticsService.getStaffPerformance(
       businessId,
       startDate,
@@ -126,7 +153,11 @@ export class AnalyticsController {
   }
 
   @Get('report')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async getReport(
     @Param('businessId') businessId: string,
     @Query('period') period: ReportPeriod | undefined,
@@ -134,7 +165,11 @@ export class AnalyticsController {
     @Query('endDate') endDateStr: string | undefined,
     @Session() session: UserSession,
   ) {
-    const { startDate, endDate } = this.getDateRange(period, startDateStr, endDateStr);
+    const { startDate, endDate } = this.getDateRange(
+      period,
+      startDateStr,
+      endDateStr,
+    );
     const report = await this.analyticsService.getDateRangeReport(
       businessId,
       startDate,
@@ -152,10 +187,16 @@ export class AnalyticsController {
     @Session() session: UserSession,
   ) {
     const date = new Date(dateStr);
-    const analytics = await this.analyticsService.getDailyAnalytics(businessId, date);
+    const analytics = await this.analyticsService.getDailyAnalytics(
+      businessId,
+      date,
+    );
 
     if (!analytics) {
-      const generated = await this.analyticsService.generateDailyAnalytics(businessId, date);
+      const generated = await this.analyticsService.generateDailyAnalytics(
+        businessId,
+        date,
+      );
       return { analytics: generated };
     }
 
@@ -163,7 +204,11 @@ export class AnalyticsController {
   }
 
   @Post('daily/generate')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async generateDailyAnalytics(
     @Param('businessId') businessId: string,
     @Body() dto: GenerateDailyReportDto,
