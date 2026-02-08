@@ -12,21 +12,21 @@ datasource db {
 }
 
 model Restaurant {
-  id                String            @id @default(uuid())
+  id                String             @id @default(uuid())
   name              String
-  slug              String            @unique
-  type              String            @default("restaurant") // Business type: restaurant, salon, gym, cafe, retail, etc.
-  logo              String?           // Cloudinary URL for business logo
-  description       String?           // Business description
+  slug              String             @unique
+  type              String             @default("restaurant") // Business type: restaurant, salon, gym, cafe, retail, etc.
+  logo              String? // Cloudinary URL for business logo
+  description       String? // Business description
   address           Json
   contact           Json
-  ownerId           String            @map("owner_id")
-  businessInfo      Json              @map("business_info")
+  ownerId           String             @map("owner_id")
+  businessInfo      Json               @map("business_info")
   settings          Json
-  status            String            @default("active")
+  status            String             @default("active")
   stats             Json?
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
   analyticsDailies  AnalyticsDaily[]
   auditLogs         AuditLog[]
   businessUsers     BusinessUser[]
@@ -37,7 +37,10 @@ model Restaurant {
   menuItems         MenuItem[]
   orders            Order[]
   payments          Payment[]
-  owner             User              @relation("RestaurantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  franchiseId       String?            @map("franchise_id")
+  configSource      String             @default("local") // "local" | "franchise" | "hybrid"
+  owner             User               @relation("RestaurantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  franchise         Franchise?         @relation("FranchiseBusinesses", fields: [franchiseId], references: [id])
   refunds           Refund[]
   stockTransactions StockTransaction[]
   tables            Table[]
@@ -51,36 +54,39 @@ model Restaurant {
   @@index([type])
   @@index([status])
   @@index([createdAt])
+  @@index([franchiseId])
   @@map("restaurants")
 }
 
 model User {
-  id                 String         @id @default(uuid())
-  email              String         @unique
-  emailVerified      Boolean        @default(false) @map("email_verified")
-  name               String?
-  image              String?
-  role               String?        // For Better Auth admin plugin
-  banned             Boolean?       // For Better Auth admin plugin
-  banReason          String?        @map("ban_reason")
-  twoFactorEnabled   Boolean?       @default(false) @map("two_factor_enabled")
-  preferences        Json?
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
-  accounts           Account[]
-  auditLogs          AuditLog[]
-  businessUsers      BusinessUser[]
-  expensesApproved   Expense[]      @relation("ExpenseApprover")
-  expensesCreated    Expense[]      @relation("ExpenseCreator")
-  orders             Order[]
-  payments           Payment[]      @relation("ProcessedPayments")
-  ownedRestaurants   Restaurant[]   @relation("RestaurantOwner")
-  sessions           Session[]
-  subscriptions      Subscription[]
-  twoFactorEntries   TwoFactor[]
-  announcements      Announcement[]
+  id                     String                  @id @default(uuid())
+  email                  String                  @unique
+  emailVerified          Boolean                 @default(false) @map("email_verified")
+  name                   String?
+  image                  String?
+  role                   String? // For Better Auth admin plugin
+  banned                 Boolean? // For Better Auth admin plugin
+  banReason              String?                 @map("ban_reason")
+  twoFactorEnabled       Boolean?                @default(false) @map("two_factor_enabled")
+  preferences            Json?
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  accounts               Account[]
+  auditLogs              AuditLog[]
+  businessUsers          BusinessUser[]
+  expensesApproved       Expense[]               @relation("ExpenseApprover")
+  expensesCreated        Expense[]               @relation("ExpenseCreator")
+  orders                 Order[]
+  payments               Payment[]               @relation("ProcessedPayments")
+  ownedRestaurants       Restaurant[]            @relation("RestaurantOwner")
+  sessions               Session[]
+  subscriptions          Subscription[]
+  twoFactorEntries       TwoFactor[]
+  announcements          Announcement[]
   announcementDismissals AnnouncementDismissal[]
-  apiKeys            ApiKey[]
+  apiKeys                ApiKey[]
+  ownedFranchises        Franchise[]             @relation("FranchiseOwner")
+  franchiseUsers         FranchiseUser[]
 
   @@index([email])
   @@map("users")
@@ -105,6 +111,53 @@ model BusinessUser {
   @@index([role])
   @@index([status])
   @@map("business_users")
+}
+
+// ==================== FRANCHISE MODELS ====================
+
+model Franchise {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  ownerId      String   @map("owner_id")
+  logo         String?
+  description  String?
+  status       String   @default("active") // active, suspended, deleted
+  settings     Json     @default("{}")
+  menuTemplate Json?    @map("menu_template")
+  branding     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  owner        User            @relation("FranchiseOwner", fields: [ownerId], references: [id])
+  businesses   Restaurant[]    @relation("FranchiseBusinesses")
+  staff        FranchiseUser[]
+  subscription Subscription?   @relation("FranchiseSubscription")
+
+  @@index([ownerId])
+  @@index([slug])
+  @@index([status])
+  @@map("franchises")
+}
+
+model FranchiseUser {
+  id          String   @id @default(uuid())
+  franchiseId String   @map("franchise_id")
+  userId      String   @map("user_id")
+  role        String // franchise_owner, manager, viewer
+  status      String   @default("active")
+  permissions String[] @default([])
+  joinedAt    DateTime @default(now()) @map("joined_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  franchise Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([franchiseId, userId])
+  @@index([franchiseId])
+  @@index([userId])
+  @@map("franchise_users")
 }
 
 model MenuItem {
@@ -158,7 +211,7 @@ model StockTransaction {
   id              String        @id @default(uuid())
   inventoryItemId String        @map("inventory_item_id")
   restaurantId    String        @map("restaurant_id")
-  type            String        // add, remove, waste, adjust
+  type            String // add, remove, waste, adjust
   quantity        Decimal       @db.Decimal(10, 3)
   previousStock   Decimal       @map("previous_stock") @db.Decimal(10, 3)
   newStock        Decimal       @map("new_stock") @db.Decimal(10, 3)
@@ -178,22 +231,22 @@ model StockTransaction {
 }
 
 model Customer {
-  id           String     @id @default(uuid())
-  restaurantId String     @map("restaurant_id")
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
   name         String
   phone        String
   email        String?
-  taxId        String?    @map("tax_id")
+  taxId        String?  @map("tax_id")
   address      Json?
-  notes        String?    @db.Text
-  tags         String[]   @default([])
-  status       String     @default("active") // active | inactive
-  createdBy    String     @map("created_by")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
+  notes        String?  @db.Text
+  tags         String[] @default([])
+  status       String   @default("active") // active | inactive
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  orders       Order[]
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders         Order[]
   loyaltyAccount LoyaltyAccount?
 
   @@unique([restaurantId, phone])
@@ -277,7 +330,7 @@ model Payment {
   processor            User?      @relation("ProcessedPayments", fields: [processedBy], references: [id])
   restaurant           Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  refundRecords        Refund[]
+  refundRecords Refund[]
 
   @@index([restaurantId, createdAt(sort: Desc)])
   @@index([orderId])
@@ -295,7 +348,7 @@ model Refund {
   restaurantId String     @map("restaurant_id")
   amount       Decimal    @db.Decimal(10, 2)
   reason       String
-  method       String     // original, cash, store_credit, etc.
+  method       String // original, cash, store_credit, etc.
   refundedBy   String     @map("refunded_by")
   refundedAt   DateTime   @default(now()) @map("refunded_at")
   createdAt    DateTime   @default(now()) @map("created_at")
@@ -518,9 +571,10 @@ model LoyaltyAccount {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  customer       Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  transactions   LoyaltyTransaction[]
+  customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+
   @@index([restaurantId])
   @@map("loyalty_accounts")
 }
@@ -528,15 +582,15 @@ model LoyaltyAccount {
 model LoyaltyTransaction {
   id               String   @id @default(uuid())
   loyaltyAccountId String   @map("loyalty_account_id")
-  type             String   // earn | redeem | adjust | expire
-  points           Int      // positive for earn, negative for redeem
-  balance          Int      // balance after transaction
+  type             String // earn | redeem | adjust | expire
+  points           Int // positive for earn, negative for redeem
+  balance          Int // balance after transaction
   orderId          String?  @map("order_id")
   description      String
   createdBy        String?  @map("created_by")
   createdAt        DateTime @default(now()) @map("created_at")
 
-  account          LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+  account LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
 
   @@index([loyaltyAccountId, createdAt(sort: Desc)])
   @@index([orderId])
@@ -620,37 +674,37 @@ enum RecurringFrequency {
 // ==================== SUBSCRIPTION MODELS ====================
 
 model SubscriptionPlan {
-  id                String   @id @default(uuid())
-  name              String   @unique // "FREE", "PRO", "ENTERPRISE"
-  slug              String   @unique // "free", "pro", "enterprise"
-  displayName       String   @map("display_name")
-  description       String?
+  id          String  @id @default(uuid())
+  name        String  @unique // "FREE", "PRO", "ENTERPRISE"
+  slug        String  @unique // "free", "pro", "enterprise"
+  displayName String  @map("display_name")
+  description String?
 
   // Pricing
-  priceMonthly      Decimal  @default(0) @map("price_monthly") @db.Decimal(10, 2)
-  priceYearly       Decimal? @map("price_yearly") @db.Decimal(10, 2)
-  currency          String   @default("INR")
+  priceMonthly Decimal  @default(0) @map("price_monthly") @db.Decimal(10, 2)
+  priceYearly  Decimal? @map("price_yearly") @db.Decimal(10, 2)
+  currency     String   @default("INR")
 
   // Dodo Integration
-  dodoProductId     String?  @unique @map("dodo_product_id")
+  dodoProductId String? @unique @map("dodo_product_id")
 
   // Account Limits (-1 = unlimited)
-  maxLocations      Int      @map("max_locations")
-  maxTeamMembers    Int      @map("max_team_members")
-  maxOrdersPerMonth Int      @map("max_orders_per_month")
+  maxLocations      Int @map("max_locations")
+  maxTeamMembers    Int @map("max_team_members")
+  maxOrdersPerMonth Int @map("max_orders_per_month")
 
   // Feature Flags
-  features          Json     // { kitchenDisplay, analytics, inventory, expenses, api, whiteLabel }
+  features Json // { kitchenDisplay, analytics, inventory, expenses, api, whiteLabel }
 
   // Metadata
-  isPublic          Boolean  @default(true) @map("is_public")
-  sortOrder         Int      @default(0) @map("sort_order")
-  status            String   @default("active") // active, archived
+  isPublic  Boolean @default(true) @map("is_public")
+  sortOrder Int     @default(0) @map("sort_order")
+  status    String  @default("active") // active, archived
 
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  subscriptions     Subscription[]
+  subscriptions Subscription[]
 
   @@index([slug])
   @@index([status])
@@ -659,36 +713,40 @@ model SubscriptionPlan {
 }
 
 model Subscription {
-  id                   String    @id @default(uuid())
-  userId               String    @map("user_id")
-  planId               String    @map("plan_id")
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  planId String @map("plan_id")
 
   // Status: active, past_due, canceled, trialing
-  status               String    @default("active")
+  status String @default("active")
 
   // Billing Period
-  currentPeriodStart   DateTime  @map("current_period_start")
-  currentPeriodEnd     DateTime  @map("current_period_end")
-  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
-  canceledAt           DateTime? @map("canceled_at")
+  currentPeriodStart DateTime  @map("current_period_start")
+  currentPeriodEnd   DateTime  @map("current_period_end")
+  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt         DateTime? @map("canceled_at")
 
   // Trial
-  trialStart           DateTime? @map("trial_start")
-  trialEnd             DateTime? @map("trial_end")
+  trialStart DateTime? @map("trial_start")
+  trialEnd   DateTime? @map("trial_end")
 
   // Dodo Integration
-  dodoSubscriptionId   String?   @unique @map("dodo_subscription_id")
-  dodoCustomerId       String?   @map("dodo_customer_id")
+  dodoSubscriptionId String? @unique @map("dodo_subscription_id")
+  dodoCustomerId     String? @map("dodo_customer_id")
 
   // Metadata
-  metadata             Json?
+  metadata Json?
 
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan                 SubscriptionPlan @relation(fields: [planId], references: [id])
-  usageRecords         UsageRecord[]
+  // Franchise-level subscription (optional)
+  franchiseId String? @unique @map("franchise_id")
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan         SubscriptionPlan @relation(fields: [planId], references: [id])
+  franchise    Franchise?       @relation("FranchiseSubscription", fields: [franchiseId], references: [id])
+  usageRecords UsageRecord[]
 
   @@index([userId])
   @@index([planId])
@@ -699,22 +757,22 @@ model Subscription {
 }
 
 model UsageRecord {
-  id              String       @id @default(uuid())
-  subscriptionId  String       @map("subscription_id")
-  restaurantId    String       @map("restaurant_id")
+  id             String @id @default(uuid())
+  subscriptionId String @map("subscription_id")
+  restaurantId   String @map("restaurant_id")
 
   // Period
-  periodStart     DateTime     @map("period_start")
-  periodEnd       DateTime     @map("period_end")
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
 
   // Usage Metrics
-  ordersCount     Int          @default(0) @map("orders_count")
+  ordersCount Int @default(0) @map("orders_count")
 
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@unique([subscriptionId, restaurantId, periodStart])
   @@index([subscriptionId])
@@ -724,18 +782,18 @@ model UsageRecord {
 }
 
 model WebhookEvent {
-  id              String    @id @default(uuid())
-  provider        String    @default("dodo") // dodo, razorpay, stripe
-  eventType       String    @map("event_type")
-  eventId         String    @unique @map("event_id") // webhook-id header for idempotency
-  payload         Json
-  status          String    @default("pending") // pending, processed, failed
-  processedAt     DateTime? @map("processed_at")
-  errorMessage    String?   @map("error_message")
-  retryCount      Int       @default(0) @map("retry_count")
+  id           String    @id @default(uuid())
+  provider     String    @default("dodo") // dodo, razorpay, stripe
+  eventType    String    @map("event_type")
+  eventId      String    @unique @map("event_id") // webhook-id header for idempotency
+  payload      Json
+  status       String    @default("pending") // pending, processed, failed
+  processedAt  DateTime? @map("processed_at")
+  errorMessage String?   @map("error_message")
+  retryCount   Int       @default(0) @map("retry_count")
 
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([provider, eventType])
   @@index([status])
@@ -746,22 +804,22 @@ model WebhookEvent {
 // ==================== ANNOUNCEMENT MODELS ====================
 
 model Announcement {
-  id          String    @id @default(uuid())
-  title       String
-  content     String    @db.Text
-  type        String    @default("info")  // info, warning, critical, maintenance
-  target      String    @default("all")   // all, business_owners, staff, specific_plan
-  targetMeta  Json?     @map("target_meta")
-  isActive    Boolean   @default(true) @map("is_active")
-  isPinned    Boolean   @default(false) @map("is_pinned")
-  publishAt   DateTime? @map("publish_at")
-  expiresAt   DateTime? @map("expires_at")
-  createdBy   String    @map("created_by")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id         String    @id @default(uuid())
+  title      String
+  content    String    @db.Text
+  type       String    @default("info") // info, warning, critical, maintenance
+  target     String    @default("all") // all, business_owners, staff, specific_plan
+  targetMeta Json?     @map("target_meta")
+  isActive   Boolean   @default(true) @map("is_active")
+  isPinned   Boolean   @default(false) @map("is_pinned")
+  publishAt  DateTime? @map("publish_at")
+  expiresAt  DateTime? @map("expires_at")
+  createdBy  String    @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  creator     User      @relation(fields: [createdBy], references: [id])
-  dismissals  AnnouncementDismissal[]
+  creator    User                    @relation(fields: [createdBy], references: [id])
+  dismissals AnnouncementDismissal[]
 
   @@index([isActive, publishAt])
   @@index([expiresAt])
@@ -770,13 +828,13 @@ model Announcement {
 }
 
 model AnnouncementDismissal {
-  id              String       @id @default(uuid())
-  announcementId  String       @map("announcement_id")
-  userId          String       @map("user_id")
-  dismissedAt     DateTime     @default(now()) @map("dismissed_at")
+  id             String   @id @default(uuid())
+  announcementId String   @map("announcement_id")
+  userId         String   @map("user_id")
+  dismissedAt    DateTime @default(now()) @map("dismissed_at")
 
-  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([announcementId, userId])
   @@map("announcement_dismissals")
@@ -785,13 +843,13 @@ model AnnouncementDismissal {
 // ==================== IMPERSONATION MODELS ====================
 
 model ImpersonationSession {
-  id              String   @id @default(uuid())
-  adminUserId     String   @map("admin_user_id")
-  targetUserId    String   @map("target_user_id")
-  adminSessionId  String   @unique @map("admin_session_id")
-  impSessionId    String   @unique @map("imp_session_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-  expiresAt       DateTime @map("expires_at")
+  id             String   @id @default(uuid())
+  adminUserId    String   @map("admin_user_id")
+  targetUserId   String   @map("target_user_id")
+  adminSessionId String   @unique @map("admin_session_id")
+  impSessionId   String   @unique @map("imp_session_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  expiresAt      DateTime @map("expires_at")
 
   @@index([adminUserId])
   @@index([impSessionId])

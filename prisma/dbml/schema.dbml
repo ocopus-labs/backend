@@ -28,7 +28,10 @@ Table restaurants {
   menuItems menu_items [not null]
   orders orders [not null]
   payments payments [not null]
+  franchiseId String
+  configSource String [not null, default: 'local']
   owner users [not null]
+  franchise franchises
   refunds refunds [not null]
   stockTransactions stock_transactions [not null]
   tables tables [not null]
@@ -65,6 +68,8 @@ Table users {
   announcements announcements [not null]
   announcementDismissals announcement_dismissals [not null]
   apiKeys api_keys [not null]
+  ownedFranchises franchises [not null]
+  franchiseUsers franchise_users [not null]
 }
 
 Table business_users {
@@ -82,6 +87,43 @@ Table business_users {
 
   indexes {
     (restaurantId, userId) [unique]
+  }
+}
+
+Table franchises {
+  id String [pk]
+  name String [not null]
+  slug String [unique, not null]
+  ownerId String [not null]
+  logo String
+  description String
+  status String [not null, default: 'active']
+  settings Json [not null, default: '{}']
+  menuTemplate Json
+  branding Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  owner users [not null]
+  businesses restaurants [not null]
+  staff franchise_users [not null]
+  subscription subscriptions
+}
+
+Table franchise_users {
+  id String [pk]
+  franchiseId String [not null]
+  userId String [not null]
+  role String [not null]
+  status String [not null, default: 'active']
+  permissions String[] [not null]
+  joinedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  franchise franchises [not null]
+  user users [not null]
+
+  indexes {
+    (franchiseId, userId) [unique]
   }
 }
 
@@ -474,8 +516,10 @@ Table subscriptions {
   metadata Json
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
+  franchiseId String [unique]
   user users [not null]
   plan subscription_plans [not null]
+  franchise franchises
   usageRecords usage_records [not null]
 }
 
@@ -646,9 +690,17 @@ Enum RecurringFrequency {
 
 Ref: restaurants.ownerId > users.id [delete: Cascade]
 
+Ref: restaurants.franchiseId > franchises.id
+
 Ref: business_users.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: business_users.userId > users.id [delete: Cascade]
+
+Ref: franchises.ownerId > users.id
+
+Ref: franchise_users.franchiseId > franchises.id [delete: Cascade]
+
+Ref: franchise_users.userId > users.id [delete: Cascade]
 
 Ref: menu_items.restaurantId > restaurants.id [delete: Cascade]
 
@@ -713,6 +765,8 @@ Ref: loyalty_transactions.loyaltyAccountId > loyalty_accounts.id [delete: Cascad
 Ref: subscriptions.userId > users.id [delete: Cascade]
 
 Ref: subscriptions.planId > subscription_plans.id
+
+Ref: subscriptions.franchiseId - franchises.id
 
 Ref: usage_records.subscriptionId > subscriptions.id [delete: Cascade]
 
