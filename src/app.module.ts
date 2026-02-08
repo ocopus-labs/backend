@@ -21,6 +21,8 @@ import { TeamModule } from './modules/team/team.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
+import { CustomerModule } from './modules/customer';
+import { LoyaltyModule } from './modules/loyalty';
 import { SearchModule } from './modules/search';
 import { McpModule } from './modules/mcp';
 
@@ -60,6 +62,8 @@ import { McpModule } from './modules/mcp';
     InventoryModule,
     ExpenseModule,
     AnalyticsModule,
+    CustomerModule,
+    LoyaltyModule,
     TeamModule,
     SubscriptionModule,
     AdminModule,
