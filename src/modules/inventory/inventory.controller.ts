@@ -20,7 +20,7 @@ import { Response } from 'express';
 import { Session } from '@thallesp/nestjs-better-auth';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryItemDto, UpdateInventoryItemDto, StockTransactionDto } from './dto';
-import { BusinessRoles, generateCsv } from 'src/lib/common';
+import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { InventoryStatus } from './interfaces';
 
@@ -35,6 +35,7 @@ interface UserSession {
 
 @Controller('business/:businessId/inventory')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class InventoryController {
   private readonly logger = new Logger(InventoryController.name);
 
