@@ -41,14 +41,51 @@ export class BusinessAccessGuard implements CanActivate {
     });
 
     if (!businessUser) {
-      throw new ForbiddenException('You do not have access to this business');
+      // Fallback: check franchise membership
+      const business = await this.prisma.restaurant.findUnique({
+        where: { id: businessId },
+        select: { franchiseId: true },
+      });
+
+      if (business?.franchiseId) {
+        const franchiseUser = await this.prisma.franchiseUser.findFirst({
+          where: {
+            userId: user.id,
+            franchiseId: business.franchiseId,
+            status: 'active',
+          },
+        });
+
+        if (franchiseUser) {
+          const mappedRole =
+            franchiseUser.role === 'franchise_owner'
+              ? 'franchise_owner'
+              : franchiseUser.role;
+
+          request.businessUser = {
+            role: mappedRole,
+            permissions: franchiseUser.permissions,
+            franchiseAccess: true,
+          };
+
+          // Continue to role/permission checks below
+        } else {
+          throw new ForbiddenException(
+            'You do not have access to this business',
+          );
+        }
+      } else {
+        throw new ForbiddenException('You do not have access to this business');
+      }
+    } else {
+      // Attach business user info to request for downstream use
+      request.businessUser = {
+        role: businessUser.role,
+        permissions: businessUser.permissions,
+      };
     }
 
-    // Attach business user info to request for downstream use
-    request.businessUser = {
-      role: businessUser.role,
-      permissions: businessUser.permissions,
-    };
+    const effectiveRole = request.businessUser.role;
 
     // Check business-specific role requirements
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
@@ -57,7 +94,7 @@ export class BusinessAccessGuard implements CanActivate {
     );
 
     if (requiredRoles && requiredRoles.length > 0) {
-      if (!requiredRoles.includes(businessUser.role)) {
+      if (!requiredRoles.includes(effectiveRole)) {
         throw new ForbiddenException(
           'You do not have permission to perform this action',
         );
@@ -71,8 +108,10 @@ export class BusinessAccessGuard implements CanActivate {
     );
 
     if (requiredPermissions && requiredPermissions.length > 0) {
-      const role = businessUser.role as UserRole;
-      const hasAll = requiredPermissions.every((perm) => hasPermission(role, perm));
+      const role = effectiveRole as UserRole;
+      const hasAll = requiredPermissions.every((perm) =>
+        hasPermission(role, perm),
+      );
       if (!hasAll) {
         throw new ForbiddenException(
           'You do not have the required permissions for this action',

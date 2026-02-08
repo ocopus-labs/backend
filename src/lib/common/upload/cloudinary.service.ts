@@ -28,7 +28,9 @@ export class CloudinaryService {
       this.isConfigured = true;
       this.logger.log('Cloudinary configured successfully');
     } else {
-      this.logger.warn('Cloudinary not configured - missing environment variables');
+      this.logger.warn(
+        'Cloudinary not configured - missing environment variables',
+      );
     }
   }
 
@@ -41,15 +43,18 @@ export class CloudinaryService {
     }
 
     try {
-      const result: UploadApiResponse = await cloudinary.uploader.upload(imageData, {
-        folder,
-        resource_type: 'image',
-        transformation: [
-          { width: 500, height: 500, crop: 'limit' },
-          { quality: 'auto' },
-          { fetch_format: 'auto' },
-        ],
-      });
+      const result: UploadApiResponse = await cloudinary.uploader.upload(
+        imageData,
+        {
+          folder,
+          resource_type: 'image',
+          transformation: [
+            { width: 500, height: 500, crop: 'limit' },
+            { quality: 'auto' },
+            { fetch_format: 'auto' },
+          ],
+        },
+      );
 
       return {
         url: result.secure_url,
