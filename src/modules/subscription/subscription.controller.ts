@@ -13,6 +13,7 @@ import { Session, AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { SubscriptionService } from './subscription.service';
 import { PlanService } from './plan.service';
 import { CreateCheckoutDto, ChangePlanDto } from './dto';
+import { HttpCacheTTL } from 'src/lib/common';
 
 interface UserSession {
   user: {
@@ -37,6 +38,7 @@ export class SubscriptionController {
    */
   @Get('plans')
   @AllowAnonymous()
+  @HttpCacheTTL(300) // Cache plans for 5 minutes
   async getPlans() {
     const plans = await this.planService.getAllPublicPlans();
     return { plans };

@@ -1,32 +1,51 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanFeatures } from './interfaces';
 
+const PLANS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 @Injectable()
 export class PlanService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cache: Cache,
+  ) {}
 
   /**
-   * Get all public subscription plans
+   * Get all public subscription plans (cached)
    */
   async getAllPublicPlans() {
-    return this.prisma.subscriptionPlan.findMany({
+    const cached = await this.cache.get('plans:public');
+    if (cached) return cached;
+
+    const plans = await this.prisma.subscriptionPlan.findMany({
       where: {
         isPublic: true,
         status: 'active',
       },
       orderBy: { sortOrder: 'asc' },
     });
+
+    await this.cache.set('plans:public', plans, PLANS_CACHE_TTL);
+    return plans;
   }
 
   /**
-   * Get all plans (including non-public)
+   * Get all plans (including non-public, cached)
    */
   async getAllPlans() {
-    return this.prisma.subscriptionPlan.findMany({
+    const cached = await this.cache.get('plans:all');
+    if (cached) return cached;
+
+    const plans = await this.prisma.subscriptionPlan.findMany({
       where: { status: 'active' },
       orderBy: { sortOrder: 'asc' },
     });
+
+    await this.cache.set('plans:all', plans, PLANS_CACHE_TTL);
+    return plans;
   }
 
   /**
