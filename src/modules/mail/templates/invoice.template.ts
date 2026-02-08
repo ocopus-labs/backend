@@ -15,6 +15,11 @@ export interface InvoiceItem {
   total: number;
 }
 
+export interface InvoiceTaxComponent {
+  name: string;
+  amount: number;
+}
+
 export interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: Date;
@@ -22,14 +27,19 @@ export interface InvoiceData {
   customerName: string;
   customerEmail?: string;
   customerAddress?: string;
+  customerTaxId?: string;
+  customerTaxIdLabel?: string;
   businessName: string;
   businessAddress?: string;
   businessPhone?: string;
   businessGstin?: string;
+  registrationNumber?: string;
+  registrationLabel?: string;
   items: InvoiceItem[];
   subtotal: number;
   taxAmount?: number;
   taxRate?: number;
+  taxBreakdown?: InvoiceTaxComponent[];
   discountAmount?: number;
   discountLabel?: string;
   totalAmount: number;
@@ -87,13 +97,14 @@ export function invoiceEmailTemplate(
           <p style="font-weight: 600; color: #111827; margin-bottom: 4px;">${data.businessName}</p>
           ${data.businessAddress ? `<p class="text-muted text-small">${data.businessAddress}</p>` : ''}
           ${data.businessPhone ? `<p class="text-muted text-small">${data.businessPhone}</p>` : ''}
-          ${data.businessGstin ? `<p class="text-muted text-small">GSTIN: ${data.businessGstin}</p>` : ''}
+          ${data.registrationNumber ? `<p class="text-muted text-small">${data.registrationLabel || 'Tax ID'}: ${data.registrationNumber}</p>` : data.businessGstin ? `<p class="text-muted text-small">GSTIN: ${data.businessGstin}</p>` : ''}
         </div>
         <div>
           <p class="text-muted text-small" style="margin-bottom: 4px;">TO</p>
           <p style="font-weight: 600; color: #111827; margin-bottom: 4px;">${data.customerName}</p>
           ${data.customerEmail ? `<p class="text-muted text-small">${data.customerEmail}</p>` : ''}
           ${data.customerAddress ? `<p class="text-muted text-small">${data.customerAddress}</p>` : ''}
+          ${data.customerTaxId ? `<p class="text-muted text-small">${data.customerTaxIdLabel || 'Tax ID'}: ${data.customerTaxId}</p>` : ''}
         </div>
       </div>
     </div>
@@ -150,7 +161,14 @@ export function invoiceEmailTemplate(
         <span class="info-label">Subtotal</span>
         <span class="info-value">${formatCurrency(data.subtotal, currency)}</span>
       </div>
-      ${data.taxAmount && data.taxRate ? `
+      ${data.taxBreakdown && data.taxBreakdown.length > 0
+        ? data.taxBreakdown.map(comp => `
+      <div class="info-row">
+        <span class="info-label">${comp.name}</span>
+        <span class="info-value">${formatCurrency(comp.amount, currency)}</span>
+      </div>
+      `).join('')
+        : data.taxAmount && data.taxRate ? `
       <div class="info-row">
         <span class="info-label">Tax (${data.taxRate}%)</span>
         <span class="info-value">${formatCurrency(data.taxAmount, currency)}</span>
@@ -206,11 +224,12 @@ ${isPaid ? '(PAID)' : data.balanceDue ? '(PENDING)' : ''}
 From: ${data.businessName}
 ${data.businessAddress || ''}
 ${data.businessPhone || ''}
-${data.businessGstin ? `GSTIN: ${data.businessGstin}` : ''}
+${data.registrationNumber ? `${data.registrationLabel || 'Tax ID'}: ${data.registrationNumber}` : data.businessGstin ? `GSTIN: ${data.businessGstin}` : ''}
 
 To: ${data.customerName}
 ${data.customerEmail || ''}
 ${data.customerAddress || ''}
+${data.customerTaxId ? `${data.customerTaxIdLabel || 'Tax ID'}: ${data.customerTaxId}` : ''}
 
 Invoice Date: ${formatDate(data.invoiceDate)}
 ${data.dueDate ? `Due Date: ${formatDate(data.dueDate)}` : ''}
@@ -220,7 +239,7 @@ Items:
 ${data.items.map(item => `- ${item.name} x${item.quantity} @ ${formatCurrency(item.unitPrice, currency)} = ${formatCurrency(item.total, currency)}`).join('\n')}
 
 Subtotal: ${formatCurrency(data.subtotal, currency)}
-${data.taxAmount && data.taxRate ? `Tax (${data.taxRate}%): ${formatCurrency(data.taxAmount, currency)}` : ''}
+${data.taxBreakdown && data.taxBreakdown.length > 0 ? data.taxBreakdown.map(comp => `${comp.name}: ${formatCurrency(comp.amount, currency)}`).join('\n') : data.taxAmount && data.taxRate ? `Tax (${data.taxRate}%): ${formatCurrency(data.taxAmount, currency)}` : ''}
 ${data.discountAmount ? `Discount: -${formatCurrency(data.discountAmount, currency)}` : ''}
 Total: ${formatCurrency(data.totalAmount, currency)}
 ${data.paidAmount !== undefined ? `Paid: ${formatCurrency(data.paidAmount, currency)}` : ''}
