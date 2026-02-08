@@ -101,7 +101,15 @@ export class CustomerController {
       search,
     });
 
-    const headers = ['Name', 'Phone', 'Email', 'Status', 'Tags', 'Notes', 'Created'];
+    const headers = [
+      'Name',
+      'Phone',
+      'Email',
+      'Status',
+      'Tags',
+      'Notes',
+      'Created',
+    ];
     const rows = customers.map((c) => [
       c.name,
       c.phone,
@@ -159,10 +167,16 @@ export class CustomerController {
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    return this.customerService.update(businessId, customerId, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.customerService.update(
+      businessId,
+      customerId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
   }
 
   @Delete(':customerId')
@@ -179,9 +193,14 @@ export class CustomerController {
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    return this.customerService.delete(businessId, customerId, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.customerService.delete(
+      businessId,
+      customerId,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
   }
 }

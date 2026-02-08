@@ -45,14 +45,25 @@ export class ExpenseService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'CREATE', 'expense_category', category.id, {
-      name: category.name,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'CREATE',
+      'expense_category',
+      category.id,
+      {
+        name: category.name,
+      },
+      context,
+    );
 
     return category;
   }
 
-  async findAllCategories(restaurantId: string, activeOnly: boolean = true): Promise<ExpenseCategory[]> {
+  async findAllCategories(
+    restaurantId: string,
+    activeOnly: boolean = true,
+  ): Promise<ExpenseCategory[]> {
     return this.prisma.expenseCategory.findMany({
       where: {
         restaurantId,
@@ -62,13 +73,19 @@ export class ExpenseService {
     });
   }
 
-  async findCategoryById(restaurantId: string, id: string): Promise<ExpenseCategory | null> {
+  async findCategoryById(
+    restaurantId: string,
+    id: string,
+  ): Promise<ExpenseCategory | null> {
     return this.prisma.expenseCategory.findFirst({
       where: { id, restaurantId },
     });
   }
 
-  async findCategoryByIdOrFail(restaurantId: string, id: string): Promise<ExpenseCategory> {
+  async findCategoryByIdOrFail(
+    restaurantId: string,
+    id: string,
+  ): Promise<ExpenseCategory> {
     const category = await this.findCategoryById(restaurantId, id);
     if (!category) {
       throw new NotFoundException(`Expense category with ID ${id} not found`);
@@ -90,14 +107,27 @@ export class ExpenseService {
       data: dto,
     });
 
-    await this.createAuditLog(restaurantId, userId, 'UPDATE', 'expense_category', id, {
-      updatedFields: Object.keys(dto),
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'UPDATE',
+      'expense_category',
+      id,
+      {
+        updatedFields: Object.keys(dto),
+      },
+      context,
+    );
 
     return category;
   }
 
-  async deleteCategory(restaurantId: string, id: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
+  async deleteCategory(
+    restaurantId: string,
+    id: string,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
     await this.findCategoryByIdOrFail(restaurantId, id);
 
     // Check if there are expenses using this category
@@ -118,7 +148,15 @@ export class ExpenseService {
       });
     }
 
-    await this.createAuditLog(restaurantId, userId, 'DELETE', 'expense_category', id, {}, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'DELETE',
+      'expense_category',
+      id,
+      {},
+      context,
+    );
   }
 
   // ============ EXPENSE METHODS ============
@@ -158,12 +196,22 @@ export class ExpenseService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'CREATE', 'expense', expense.id, {
-      title: expense.title,
-      amount: Number(expense.amount),
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'CREATE',
+      'expense',
+      expense.id,
+      {
+        title: expense.title,
+        amount: Number(expense.amount),
+      },
+      context,
+    );
 
-    this.logger.log(`Expense ${expense.title} created for restaurant ${restaurantId}`);
+    this.logger.log(
+      `Expense ${expense.title} created for restaurant ${restaurantId}`,
+    );
 
     return expense;
   }
@@ -187,8 +235,10 @@ export class ExpenseService {
     if (options?.createdBy) where.createdBy = options.createdBy;
     if (options?.startDate || options?.endDate) {
       where.expenseDate = {};
-      if (options.startDate) (where.expenseDate as Record<string, Date>).gte = options.startDate;
-      if (options.endDate) (where.expenseDate as Record<string, Date>).lte = options.endDate;
+      if (options.startDate)
+        (where.expenseDate as Record<string, Date>).gte = options.startDate;
+      if (options.endDate)
+        (where.expenseDate as Record<string, Date>).lte = options.endDate;
     }
 
     const [expenses, total] = await this.prisma.$transaction([
@@ -254,9 +304,17 @@ export class ExpenseService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'UPDATE', 'expense', id, {
-      updatedFields: Object.keys(dto),
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'UPDATE',
+      'expense',
+      id,
+      {
+        updatedFields: Object.keys(dto),
+      },
+      context,
+    );
 
     return expense;
   }
@@ -287,9 +345,17 @@ export class ExpenseService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'APPROVE', 'expense', id, {
-      title: expense.title,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'APPROVE',
+      'expense',
+      id,
+      {
+        title: expense.title,
+      },
+      context,
+    );
 
     return updated;
   }
@@ -320,10 +386,18 @@ export class ExpenseService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'REJECT', 'expense', id, {
-      title: expense.title,
-      reason,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'REJECT',
+      'expense',
+      id,
+      {
+        title: expense.title,
+        reason,
+      },
+      context,
+    );
 
     return updated;
   }
@@ -338,7 +412,9 @@ export class ExpenseService {
     const expense = await this.findByIdOrFail(restaurantId, id);
 
     if (expense.status !== EXPENSE_STATUSES.APPROVED) {
-      throw new BadRequestException('Only approved expenses can be marked as paid');
+      throw new BadRequestException(
+        'Only approved expenses can be marked as paid',
+      );
     }
 
     const updated = await this.prisma.expense.update({
@@ -352,14 +428,27 @@ export class ExpenseService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'MARK_PAID', 'expense', id, {
-      title: expense.title,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'MARK_PAID',
+      'expense',
+      id,
+      {
+        title: expense.title,
+      },
+      context,
+    );
 
     return updated;
   }
 
-  async delete(restaurantId: string, id: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
+  async delete(
+    restaurantId: string,
+    id: string,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
     const expense = await this.findByIdOrFail(restaurantId, id);
 
     if (expense.status === EXPENSE_STATUSES.PAID) {
@@ -370,11 +459,21 @@ export class ExpenseService {
       where: { id },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'DELETE', 'expense', id, {
-      title: expense.title,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'DELETE',
+      'expense',
+      id,
+      {
+        title: expense.title,
+      },
+      context,
+    );
 
-    this.logger.log(`Expense ${expense.title} deleted from restaurant ${restaurantId}`);
+    this.logger.log(
+      `Expense ${expense.title} deleted from restaurant ${restaurantId}`,
+    );
   }
 
   async getSummary(
@@ -385,7 +484,8 @@ export class ExpenseService {
     const where: Record<string, unknown> = { restaurantId };
     if (startDate || endDate) {
       where.expenseDate = {};
-      if (startDate) (where.expenseDate as Record<string, Date>).gte = startDate;
+      if (startDate)
+        (where.expenseDate as Record<string, Date>).gte = startDate;
       if (endDate) (where.expenseDate as Record<string, Date>).lte = endDate;
     }
 

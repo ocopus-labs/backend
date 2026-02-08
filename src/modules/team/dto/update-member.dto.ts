@@ -1,10 +1,10 @@
+import { IsString, IsEnum, IsArray, IsOptional } from 'class-validator';
 import {
-  IsString,
-  IsEnum,
-  IsArray,
-  IsOptional,
-} from 'class-validator';
-import { ASSIGNABLE_ROLES, TEAM_MEMBER_STATUSES, AssignableRole, TeamMemberStatus } from '../interfaces';
+  ASSIGNABLE_ROLES,
+  TEAM_MEMBER_STATUSES,
+  AssignableRole,
+  TeamMemberStatus,
+} from '../interfaces';
 
 export class UpdateTeamMemberDto {
   @IsEnum(ASSIGNABLE_ROLES)

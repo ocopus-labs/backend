@@ -68,7 +68,13 @@ export class MailController {
    */
   @Post('notify')
   async sendNotification(
-    @Body() body: { email: string; title: string; message: string; name?: string },
+    @Body()
+    body: {
+      email: string;
+      title: string;
+      message: string;
+      name?: string;
+    },
   ) {
     return await this.mailService.sendNotification(body.email, {
       userName: body.name || 'User',

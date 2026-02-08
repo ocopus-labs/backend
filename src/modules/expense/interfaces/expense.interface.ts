@@ -1,4 +1,7 @@
-import { Expense as PrismaExpense, ExpenseCategory as PrismaExpenseCategory } from '@prisma/client';
+import {
+  Expense as PrismaExpense,
+  ExpenseCategory as PrismaExpenseCategory,
+} from '@prisma/client';
 
 export type Expense = PrismaExpense;
 export type ExpenseCategory = PrismaExpenseCategory;

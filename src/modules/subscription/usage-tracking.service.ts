@@ -54,30 +54,54 @@ export class UsageTrackingService {
   }
 
   /**
+   * Get the applicable subscription for a restaurant.
+   * Checks franchise-level subscription first, then falls back to owner's subscription.
+   */
+  private async getSubscriptionForRestaurant(restaurantId: string) {
+    const restaurant = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { franchiseId: true, ownerId: true },
+    });
+
+    if (!restaurant) return null;
+
+    // Check franchise subscription first
+    if (restaurant.franchiseId) {
+      const franchiseSub = await this.prisma.subscription.findFirst({
+        where: {
+          franchiseId: restaurant.franchiseId,
+          status: { in: ['active', 'trialing'] },
+        },
+        include: { plan: true },
+      });
+      if (franchiseSub) return franchiseSub;
+    }
+
+    // Fall back to owner's subscription
+    const ownerSub = await this.prisma.subscription.findFirst({
+      where: {
+        userId: restaurant.ownerId,
+        status: { in: ['active', 'trialing'] },
+      },
+      include: { plan: true },
+    });
+
+    return ownerSub;
+  }
+
+  /**
    * Increment order usage for a restaurant
    */
   async incrementOrderUsage(restaurantId: string): Promise<void> {
-    // Get restaurant and owner's subscription
-    const restaurant = await this.prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      include: {
-        owner: {
-          include: {
-            subscriptions: {
-              where: { status: { in: ['active', 'trialing'] } },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const subscription = await this.getSubscriptionForRestaurant(restaurantId);
 
-    if (!restaurant?.owner?.subscriptions?.[0]) {
-      this.logger.debug(`No active subscription found for restaurant ${restaurantId}`);
+    if (!subscription) {
+      this.logger.debug(
+        `No active subscription found for restaurant ${restaurantId}`,
+      );
       return;
     }
 
-    const subscription = restaurant.owner.subscriptions[0];
     const usageRecord = await this.getOrCreateUsageRecord(
       subscription.id,
       restaurantId,
@@ -97,22 +121,9 @@ export class UsageTrackingService {
    * Check if a restaurant can create more orders this month
    */
   async checkOrderLimit(restaurantId: string): Promise<LimitCheckResult> {
-    const restaurant = await this.prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      include: {
-        owner: {
-          include: {
-            subscriptions: {
-              where: { status: { in: ['active', 'trialing'] } },
-              include: { plan: true },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const subscription = await this.getSubscriptionForRestaurant(restaurantId);
 
-    if (!restaurant?.owner?.subscriptions?.[0]) {
+    if (!subscription) {
       // No subscription = use free plan defaults
       return {
         allowed: true,
@@ -122,7 +133,6 @@ export class UsageTrackingService {
       };
     }
 
-    const subscription = restaurant.owner.subscriptions[0];
     const plan = subscription.plan;
 
     // Unlimited orders
@@ -148,9 +158,47 @@ export class UsageTrackingService {
   }
 
   /**
-   * Check if a user can add more locations
+   * Check if a user can add more locations.
+   * Accepts optional franchiseId — when provided, checks franchise subscription and counts franchise locations.
    */
-  async checkLocationLimit(userId: string): Promise<LimitCheckResult> {
+  async checkLocationLimit(
+    userId: string,
+    franchiseId?: string,
+  ): Promise<LimitCheckResult> {
+    // If franchise-scoped, check franchise subscription
+    if (franchiseId) {
+      const franchiseSub = await this.prisma.subscription.findFirst({
+        where: {
+          franchiseId,
+          status: { in: ['active', 'trialing'] },
+        },
+        include: { plan: true },
+      });
+
+      const currentCount = await this.prisma.restaurant.count({
+        where: { franchiseId, status: { not: 'deleted' } },
+      });
+
+      if (!franchiseSub) {
+        // Fall through to user-level check below
+      } else {
+        const plan = franchiseSub.plan;
+        if (plan.maxLocations === -1) {
+          return { allowed: true, current: currentCount, limit: -1 };
+        }
+        const allowed = currentCount < plan.maxLocations;
+        return {
+          allowed,
+          current: currentCount,
+          limit: plan.maxLocations,
+          message: allowed
+            ? undefined
+            : `Franchise location limit reached (${currentCount}/${plan.maxLocations}). Please upgrade your plan.`,
+        };
+      }
+    }
+
+    // User-level subscription check
     const subscription = await this.prisma.subscription.findFirst({
       where: {
         userId,
@@ -160,7 +208,6 @@ export class UsageTrackingService {
     });
 
     if (!subscription) {
-      // No subscription = use free plan defaults
       const currentCount = await this.prisma.restaurant.count({
         where: { ownerId: userId },
       });
@@ -173,7 +220,6 @@ export class UsageTrackingService {
 
     const plan = subscription.plan;
 
-    // Unlimited locations
     if (plan.maxLocations === -1) {
       return { allowed: true, current: 0, limit: -1 };
     }
@@ -198,23 +244,9 @@ export class UsageTrackingService {
    * Check if a business can add more team members
    */
   async checkTeamMemberLimit(restaurantId: string): Promise<LimitCheckResult> {
-    const restaurant = await this.prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      include: {
-        owner: {
-          include: {
-            subscriptions: {
-              where: { status: { in: ['active', 'trialing'] } },
-              include: { plan: true },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
+    const subscription = await this.getSubscriptionForRestaurant(restaurantId);
 
-    if (!restaurant?.owner?.subscriptions?.[0]) {
-      // No subscription = use free plan defaults
+    if (!subscription) {
       const currentCount = await this.prisma.businessUser.count({
         where: { restaurantId },
       });
@@ -225,9 +257,8 @@ export class UsageTrackingService {
       };
     }
 
-    const plan = restaurant.owner.subscriptions[0].plan;
+    const plan = subscription.plan;
 
-    // Unlimited team members
     if (plan.maxTeamMembers === -1) {
       return { allowed: true, current: 0, limit: -1 };
     }
@@ -291,11 +322,13 @@ export class UsageTrackingService {
 
     return {
       ordersThisMonth,
-      orderLimit: plan?.maxOrdersPerMonth ?? FREE_PLAN_DEFAULTS.maxOrdersPerMonth,
+      orderLimit:
+        plan?.maxOrdersPerMonth ?? FREE_PLAN_DEFAULTS.maxOrdersPerMonth,
       locationsCount: restaurants.length,
       locationLimit: plan?.maxLocations ?? FREE_PLAN_DEFAULTS.maxLocations,
       teamMembersCount,
-      teamMemberLimit: plan?.maxTeamMembers ?? FREE_PLAN_DEFAULTS.maxTeamMembers,
+      teamMemberLimit:
+        plan?.maxTeamMembers ?? FREE_PLAN_DEFAULTS.maxTeamMembers,
       periodStart: start,
       periodEnd: end,
     };

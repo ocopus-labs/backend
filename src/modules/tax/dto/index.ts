@@ -1,1 +1,4 @@
-export { UpdateTaxSettingsDto, ValidateRegistrationDto } from './update-tax-settings.dto';
+export {
+  UpdateTaxSettingsDto,
+  ValidateRegistrationDto,
+} from './update-tax-settings.dto';

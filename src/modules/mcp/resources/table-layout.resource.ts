@@ -1,11 +1,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpContext } from '../interfaces';
 
-export function registerTableLayoutResource(server: McpServer, ctx: McpContext) {
+export function registerTableLayoutResource(
+  server: McpServer,
+  ctx: McpContext,
+) {
   server.resource(
     'table-layout',
     'business://tables',
-    { description: 'Table layout with positions, statuses, capacity, and active sessions' },
+    {
+      description:
+        'Table layout with positions, statuses, capacity, and active sessions',
+    },
     async () => {
       const tables = await ctx.tableService.findAll(ctx.businessId);
       return {

@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { CloudinaryService } from 'src/lib/common/upload';
-import { CreateBusinessDto, UpdateBusinessDto, UpdateBusinessSettingsDto } from './dto';
+import {
+  CreateBusinessDto,
+  UpdateBusinessDto,
+  UpdateBusinessSettingsDto,
+} from './dto';
 import { USER_ROLES, getRolePermissions } from 'src/lib/auth/roles.constants';
 import { Business, BusinessWithUsers } from './interfaces';
 import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
@@ -24,7 +28,8 @@ export class BusinessService {
 
   async create(dto: CreateBusinessDto, ownerId: string): Promise<Business> {
     // Check subscription location limit
-    const limitCheck = await this.usageTrackingService.checkLocationLimit(ownerId);
+    const limitCheck =
+      await this.usageTrackingService.checkLocationLimit(ownerId);
     if (!limitCheck.allowed) {
       throw new ForbiddenException(
         limitCheck.message ||
@@ -49,9 +54,10 @@ export class BusinessService {
             state: dto.address.state || '',
             country: dto.address.country,
             postalCode: dto.address.postalCode || '',
-            coordinates: dto.address.lat && dto.address.lng
-              ? { lat: dto.address.lat, lng: dto.address.lng }
-              : null,
+            coordinates:
+              dto.address.lat && dto.address.lng
+                ? { lat: dto.address.lat, lng: dto.address.lng }
+                : null,
           },
           contact: {
             email: dto.contact.email,
@@ -100,7 +106,9 @@ export class BusinessService {
       return biz;
     });
 
-    this.logger.log(`Business created: ${business.name} (${business.id}) by user ${ownerId}`);
+    this.logger.log(
+      `Business created: ${business.name} (${business.id}) by user ${ownerId}`,
+    );
     return business;
   }
 
@@ -132,6 +140,7 @@ export class BusinessService {
   }
 
   async getUserBusinesses(userId: string): Promise<Business[]> {
+    // Get directly assigned businesses
     const businessUsers = await this.prisma.businessUser.findMany({
       where: {
         userId,
@@ -143,10 +152,37 @@ export class BusinessService {
       orderBy: { joinedAt: 'desc' },
     });
 
-    return businessUsers.map((bu) => bu.restaurant);
+    const directBusinesses = businessUsers.map((bu) => bu.restaurant);
+    const directIds = new Set(directBusinesses.map((b) => b.id));
+
+    // Get businesses from franchise membership
+    const franchiseUsers = await this.prisma.franchiseUser.findMany({
+      where: { userId, status: 'active' },
+      select: { franchiseId: true },
+    });
+
+    if (franchiseUsers.length > 0) {
+      const franchiseIds = franchiseUsers.map((fu) => fu.franchiseId);
+      const franchiseBusinesses = await this.prisma.restaurant.findMany({
+        where: {
+          franchiseId: { in: franchiseIds },
+          status: { not: 'deleted' },
+          id: { notIn: Array.from(directIds) },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return [...directBusinesses, ...franchiseBusinesses];
+    }
+
+    return directBusinesses;
   }
 
-  async update(id: string, dto: UpdateBusinessDto, userId: string): Promise<Business> {
+  async update(
+    id: string,
+    dto: UpdateBusinessDto,
+    userId: string,
+  ): Promise<Business> {
     await this.findByIdOrFail(id);
 
     const updateData: Record<string, unknown> = {};
@@ -164,9 +200,10 @@ export class BusinessService {
         state: dto.address.state || '',
         country: dto.address.country,
         postalCode: dto.address.postalCode || '',
-        coordinates: dto.address.lat && dto.address.lng
-          ? { lat: dto.address.lat, lng: dto.address.lng }
-          : null,
+        coordinates:
+          dto.address.lat && dto.address.lng
+            ? { lat: dto.address.lat, lng: dto.address.lng }
+            : null,
       };
     }
 
@@ -191,12 +228,18 @@ export class BusinessService {
       data: updateData,
     });
 
-    await this.createAuditLog(id, userId, 'business.update', 'business', { updatedFields: Object.keys(dto) });
+    await this.createAuditLog(id, userId, 'business.update', 'business', {
+      updatedFields: Object.keys(dto),
+    });
 
     return business;
   }
 
-  async updateSettings(id: string, dto: UpdateBusinessSettingsDto, userId: string): Promise<Business> {
+  async updateSettings(
+    id: string,
+    dto: UpdateBusinessSettingsDto,
+    userId: string,
+  ): Promise<Business> {
     const business = await this.findByIdOrFail(id);
     const currentSettings = business.settings as Record<string, unknown>;
 
@@ -210,19 +253,32 @@ export class BusinessService {
       data: { settings: updatedSettings },
     });
 
-    await this.createAuditLog(id, userId, 'business.update_settings', 'business', { updatedFields: Object.keys(dto) });
+    await this.createAuditLog(
+      id,
+      userId,
+      'business.update_settings',
+      'business',
+      { updatedFields: Object.keys(dto) },
+    );
 
     return updated;
   }
 
-  async updateLogo(id: string, imageData: string, userId: string): Promise<Business> {
+  async updateLogo(
+    id: string,
+    imageData: string,
+    userId: string,
+  ): Promise<Business> {
     await this.findByIdOrFail(id);
 
     let logoUrl = imageData;
 
     // If it's base64 data, upload to Cloudinary
     if (imageData.startsWith('data:')) {
-      const uploadResult = await this.cloudinaryService.uploadImage(imageData, 'business-logos');
+      const uploadResult = await this.cloudinaryService.uploadImage(
+        imageData,
+        'business-logos',
+      );
       logoUrl = uploadResult.url;
     }
 
@@ -231,7 +287,13 @@ export class BusinessService {
       data: { logo: logoUrl },
     });
 
-    await this.createAuditLog(id, userId, 'business.update_logo', 'business', {});
+    await this.createAuditLog(
+      id,
+      userId,
+      'business.update_logo',
+      'business',
+      {},
+    );
 
     return business;
   }
@@ -259,10 +321,32 @@ export class BusinessService {
       },
     });
 
-    return !!businessUser;
+    if (businessUser) return true;
+
+    // Franchise fallback
+    const business = await this.prisma.restaurant.findUnique({
+      where: { id: businessId },
+      select: { franchiseId: true },
+    });
+
+    if (business?.franchiseId) {
+      const franchiseUser = await this.prisma.franchiseUser.findFirst({
+        where: {
+          userId,
+          franchiseId: business.franchiseId,
+          status: 'active',
+        },
+      });
+      return !!franchiseUser;
+    }
+
+    return false;
   }
 
-  async getUserRole(userId: string, businessId: string): Promise<string | null> {
+  async getUserRole(
+    userId: string,
+    businessId: string,
+  ): Promise<string | null> {
     const businessUser = await this.prisma.businessUser.findFirst({
       where: {
         userId,
@@ -271,7 +355,26 @@ export class BusinessService {
       },
     });
 
-    return businessUser?.role || null;
+    if (businessUser) return businessUser.role;
+
+    // Franchise fallback
+    const business = await this.prisma.restaurant.findUnique({
+      where: { id: businessId },
+      select: { franchiseId: true },
+    });
+
+    if (business?.franchiseId) {
+      const franchiseUser = await this.prisma.franchiseUser.findFirst({
+        where: {
+          userId,
+          franchiseId: business.franchiseId,
+          status: 'active',
+        },
+      });
+      return franchiseUser?.role || null;
+    }
+
+    return null;
   }
 
   private async generateSlug(name: string): Promise<string> {

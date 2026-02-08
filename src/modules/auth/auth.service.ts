@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AuthService as BetterAuthService } from '@thallesp/nestjs-better-auth';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,7 +30,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private betterAuthService: BetterAuthService<AuthConfig>,
-  ) { }
+  ) {}
 
   /**
    * Get user by ID with role information
@@ -157,7 +162,7 @@ export class AuthService {
       ]);
 
       // Fetch roles for all users in a single query
-      const userIds = users.map(u => u.id);
+      const userIds = users.map((u) => u.id);
       const businessUsers = await this.prisma.businessUser.findMany({
         where: { userId: { in: userIds } },
         select: { userId: true, role: true },
@@ -166,7 +171,7 @@ export class AuthService {
       });
 
       // Create a map for faster lookup
-      const roleMap = new Map(businessUsers.map(bu => [bu.userId, bu.role]));
+      const roleMap = new Map(businessUsers.map((bu) => [bu.userId, bu.role]));
 
       const usersWithRoles = users.map((user) => ({
         id: user.id,
@@ -199,7 +204,9 @@ export class AuthService {
       });
 
       if (result.count === 0) {
-        throw new NotFoundException(`User ${userId} not found in restaurant ${restaurantId}`);
+        throw new NotFoundException(
+          `User ${userId} not found in restaurant ${restaurantId}`,
+        );
       }
 
       this.logger.log(
@@ -303,12 +310,16 @@ export class AuthService {
       });
 
       if (result.count === 0) {
-        this.logger.warn(`Attempted to ban user ${userId} but no business user record found`);
+        this.logger.warn(
+          `Attempted to ban user ${userId} but no business user record found`,
+        );
         // We might want to ban the main user record too if business user doesn't exist
         // For now, assuming business user exists for all active users
       }
 
-      this.logger.log(`Banned user ${userId}. Reason: ${reason || 'No reason'}`);
+      this.logger.log(
+        `Banned user ${userId}. Reason: ${reason || 'No reason'}`,
+      );
     } catch (error) {
       this.logger.error(`Error banning user: ${error}`);
       throw new InternalServerErrorException('Failed to ban user');
@@ -371,7 +382,10 @@ export class AuthService {
         select: { preferences: true },
       });
 
-      return { ...defaultPreferences, ...(user?.preferences as Record<string, boolean> || {}) };
+      return {
+        ...defaultPreferences,
+        ...((user?.preferences as Record<string, boolean>) || {}),
+      };
     } catch (error) {
       this.logger.error(`Error getting preferences: ${error}`);
       return defaultPreferences;

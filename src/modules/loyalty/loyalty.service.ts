@@ -152,9 +152,7 @@ export class LoyaltyService {
     });
 
     if (existing) {
-      this.logger.debug(
-        `Loyalty points already awarded for order ${orderId}`,
-      );
+      this.logger.debug(`Loyalty points already awarded for order ${orderId}`);
       return null;
     }
 
@@ -173,7 +171,9 @@ export class LoyaltyService {
 
     // Calculate points: subtotal × pointsPerUnit × tierMultiplier
     const tierMultiplier =
-      settings.tierMultipliers[account.tier as keyof typeof settings.tierMultipliers] || 1;
+      settings.tierMultipliers[
+        account.tier as keyof typeof settings.tierMultipliers
+      ] || 1;
     const rawPoints = Math.floor(
       pricing.subtotal * settings.pointsPerUnit * tierMultiplier,
     );
@@ -221,11 +221,7 @@ export class LoyaltyService {
     return result;
   }
 
-  async redeemPoints(
-    businessId: string,
-    customerId: string,
-    points: number,
-  ) {
+  async redeemPoints(businessId: string, customerId: string, points: number) {
     const settings = await this.getSettings(businessId);
 
     if (!settings.enabled) {
@@ -287,9 +283,7 @@ export class LoyaltyService {
     }
 
     const newLifetime =
-      points > 0
-        ? account.lifetimePoints + points
-        : account.lifetimePoints;
+      points > 0 ? account.lifetimePoints + points : account.lifetimePoints;
 
     const settings = await this.getSettings(businessId);
     const newTier = this.calculateTier(newLifetime, settings, account.tier);

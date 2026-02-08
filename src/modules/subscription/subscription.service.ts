@@ -24,13 +24,16 @@ export class SubscriptionService {
     private usageTracking: UsageTrackingService,
     private configService: ConfigService,
   ) {
-    this.appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:5173';
+    this.appUrl =
+      this.configService.get<string>('APP_URL') || 'http://localhost:5173';
   }
 
   /**
    * Get active subscription for a user
    */
-  async getActiveSubscription(userId: string): Promise<(Subscription & { plan: SubscriptionPlan }) | null> {
+  async getActiveSubscription(
+    userId: string,
+  ): Promise<(Subscription & { plan: SubscriptionPlan }) | null> {
     return this.prisma.subscription.findFirst({
       where: {
         userId,
@@ -55,7 +58,9 @@ export class SubscriptionService {
    * Create or get a subscription for a user
    * New users start on free plan
    */
-  async ensureSubscription(userId: string): Promise<Subscription & { plan: SubscriptionPlan }> {
+  async ensureSubscription(
+    userId: string,
+  ): Promise<Subscription & { plan: SubscriptionPlan }> {
     const existing = await this.getActiveSubscription(userId);
     if (existing) {
       return existing;
@@ -64,7 +69,11 @@ export class SubscriptionService {
     // Create free subscription
     const freePlan = await this.planService.getFreePlan();
     const now = new Date();
-    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    const periodEnd = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      now.getDate(),
+    );
 
     const subscription = await this.prisma.subscription.create({
       data: {
@@ -92,7 +101,9 @@ export class SubscriptionService {
     const plan = await this.planService.getPlanBySlug(planSlug);
 
     if (!plan.dodoProductId) {
-      throw new BadRequestException(`Plan '${planSlug}' is not available for purchase`);
+      throw new BadRequestException(
+        `Plan '${planSlug}' is not available for purchase`,
+      );
     }
 
     // Get or create subscription to store the dodo customer ID
@@ -103,14 +114,18 @@ export class SubscriptionService {
       customerEmail: user.email,
       customerName: user.name || user.email.split('@')[0],
       customerId: subscription.dodoCustomerId || undefined,
-      returnUrl: (returnUrl || `${this.appUrl}/dashboard/subscriptions/result`) + '?from=checkout',
+      returnUrl:
+        (returnUrl || `${this.appUrl}/dashboard/subscriptions/result`) +
+        '?from=checkout',
       metadata: {
         user_id: user.id,
         plan_slug: planSlug,
       },
     });
 
-    this.logger.log(`Created checkout session for user ${user.id}, plan ${planSlug}`);
+    this.logger.log(
+      `Created checkout session for user ${user.id}, plan ${planSlug}`,
+    );
 
     return checkout;
   }
@@ -134,7 +149,9 @@ export class SubscriptionService {
     // Find the plan by Dodo product ID
     const plan = await this.planService.getPlanByDodoProductId(dodoProductId);
     if (!plan) {
-      throw new NotFoundException(`Plan not found for Dodo product ${dodoProductId}`);
+      throw new NotFoundException(
+        `Plan not found for Dodo product ${dodoProductId}`,
+      );
     }
 
     // Get existing subscription
@@ -159,7 +176,9 @@ export class SubscriptionService {
         },
       });
 
-      this.logger.log(`Upgraded subscription ${existing.id} to plan ${plan.slug}`);
+      this.logger.log(
+        `Upgraded subscription ${existing.id} to plan ${plan.slug}`,
+      );
     } else {
       // Create new subscription
       await this.prisma.subscription.create({
@@ -174,7 +193,9 @@ export class SubscriptionService {
         },
       });
 
-      this.logger.log(`Created new subscription for user ${userId}, plan ${plan.slug}`);
+      this.logger.log(
+        `Created new subscription for user ${userId}, plan ${plan.slug}`,
+      );
     }
   }
 
@@ -192,7 +213,9 @@ export class SubscriptionService {
     }
 
     if (subscription.dodoSubscriptionId) {
-      await this.dodoService.cancelSubscription(subscription.dodoSubscriptionId);
+      await this.dodoService.cancelSubscription(
+        subscription.dodoSubscriptionId,
+      );
     }
 
     if (immediate) {
@@ -216,7 +239,9 @@ export class SubscriptionService {
       });
     }
 
-    this.logger.log(`Cancelled subscription for user ${userId}, immediate: ${immediate}`);
+    this.logger.log(
+      `Cancelled subscription for user ${userId}, immediate: ${immediate}`,
+    );
 
     return { success: true, cancelAtPeriodEnd: !immediate };
   }
@@ -227,7 +252,9 @@ export class SubscriptionService {
   async handleCancellation(dodoSubscriptionId: string) {
     const subscription = await this.getByDodoSubscriptionId(dodoSubscriptionId);
     if (!subscription) {
-      this.logger.warn(`Subscription not found for Dodo ID: ${dodoSubscriptionId}`);
+      this.logger.warn(
+        `Subscription not found for Dodo ID: ${dodoSubscriptionId}`,
+      );
       return;
     }
 
@@ -244,7 +271,9 @@ export class SubscriptionService {
       },
     });
 
-    this.logger.log(`Subscription ${subscription.id} cancelled and downgraded to free`);
+    this.logger.log(
+      `Subscription ${subscription.id} cancelled and downgraded to free`,
+    );
   }
 
   /**
@@ -261,7 +290,9 @@ export class SubscriptionService {
       data: { status: 'past_due' },
     });
 
-    this.logger.warn(`Subscription ${subscription.id} marked as past_due due to payment failure`);
+    this.logger.warn(
+      `Subscription ${subscription.id} marked as past_due due to payment failure`,
+    );
   }
 
   /**
@@ -289,7 +320,9 @@ export class SubscriptionService {
     // Reset usage for the new period
     await this.usageTracking.resetMonthlyUsage(subscription.id);
 
-    this.logger.log(`Updated billing period for subscription ${subscription.id}`);
+    this.logger.log(
+      `Updated billing period for subscription ${subscription.id}`,
+    );
   }
 
   /**
@@ -318,7 +351,9 @@ export class SubscriptionService {
     const plan = await this.planService.getPlanBySlug(planSlug);
 
     if (!plan.dodoProductId) {
-      throw new BadRequestException(`Plan '${planSlug}' is not available for purchase`);
+      throw new BadRequestException(
+        `Plan '${planSlug}' is not available for purchase`,
+      );
     }
 
     const subscription = await this.getActiveSubscription(user.id);
@@ -346,10 +381,14 @@ export class SubscriptionService {
   async getCustomerPortalUrl(userId: string): Promise<string> {
     const subscription = await this.getActiveSubscription(userId);
     if (!subscription?.dodoCustomerId) {
-      throw new BadRequestException('No billing account found. Please upgrade to a paid plan first.');
+      throw new BadRequestException(
+        'No billing account found. Please upgrade to a paid plan first.',
+      );
     }
 
-    const portal = await this.dodoService.createPortalSession(subscription.dodoCustomerId);
+    const portal = await this.dodoService.createPortalSession(
+      subscription.dodoCustomerId,
+    );
     return portal.link;
   }
 

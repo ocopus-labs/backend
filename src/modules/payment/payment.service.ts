@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { randomUUID } from 'crypto';
@@ -53,7 +59,9 @@ export class PaymentService {
         },
       });
       if (existing) {
-        throw new ConflictException('Duplicate payment: this request has already been processed');
+        throw new ConflictException(
+          'Duplicate payment: this request has already been processed',
+        );
       }
     }
 
@@ -82,14 +90,26 @@ export class PaymentService {
     }
 
     const paymentNumber = this.generatePaymentNumber();
-    const pricing = order.pricing as { subtotal: number; taxRate: number; taxAmount: number; total: number; taxBreakdown?: { regime: string; componentTotals: Record<string, number>; totalTax: number } };
+    const pricing = order.pricing as {
+      subtotal: number;
+      taxRate: number;
+      taxAmount: number;
+      total: number;
+      taxBreakdown?: {
+        regime: string;
+        componentTotals: Record<string, number>;
+        totalTax: number;
+      };
+    };
 
     // Calculate change for cash payments
     let change = 0;
     if (dto.method === 'cash' && dto.cashReceived) {
       change = dto.cashReceived - dto.amount;
       if (change < 0) {
-        throw new BadRequestException('Cash received is less than payment amount');
+        throw new BadRequestException(
+          'Cash received is less than payment amount',
+        );
       }
     }
 
@@ -123,7 +143,7 @@ export class PaymentService {
           method: dto.method,
           status: 'completed',
           customerInfo: (dto.customerInfo || {}) as object,
-          billingAddress: dto.billingAddress as object || null,
+          billingAddress: (dto.billingAddress as object) || null,
           taxDetails: taxDetails as object,
           processedBy: staffId,
           processedAt: new Date(),
@@ -144,10 +164,13 @@ export class PaymentService {
       let invoiceNumber: string | undefined;
       if (newPaymentStatus === 'paid') {
         try {
-          invoiceNumber = await this.taxService.generateInvoiceNumber(businessId);
+          invoiceNumber =
+            await this.taxService.generateInvoiceNumber(businessId);
         } catch (err) {
           // Tax not enabled or invoice generation failed — skip silently
-          this.logger.debug(`Invoice number generation skipped: ${(err as Error).message}`);
+          this.logger.debug(
+            `Invoice number generation skipped: ${(err as Error).message}`,
+          );
         }
       }
 
@@ -161,7 +184,10 @@ export class PaymentService {
       });
 
       // Add audit trail entry for payment status change on the order
-      const existingAuditTrail = (updatedOrder.auditTrail as unknown as Array<Record<string, unknown>>) || [];
+      const existingAuditTrail =
+        (updatedOrder.auditTrail as unknown as Array<
+          Record<string, unknown>
+        >) || [];
       existingAuditTrail.push({
         action: 'order.payment_received',
         performedBy: staffId,
@@ -227,7 +253,9 @@ export class PaymentService {
         },
       });
       if (existing) {
-        throw new ConflictException('Duplicate payment: this request has already been processed');
+        throw new ConflictException(
+          'Duplicate payment: this request has already been processed',
+        );
       }
     }
 
@@ -244,7 +272,10 @@ export class PaymentService {
       throw new BadRequestException('Order is already fully paid');
     }
 
-    const totalPaymentAmount = dto.payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaymentAmount = dto.payments.reduce(
+      (sum, p) => sum + p.amount,
+      0,
+    );
     const balanceDue = Number(order.balanceDue);
 
     if (totalPaymentAmount > balanceDue) {
@@ -254,7 +285,10 @@ export class PaymentService {
     }
 
     // Validate split amounts reconcile to balance (within tolerance)
-    if (Math.abs(totalPaymentAmount - balanceDue) > 0.01 && totalPaymentAmount < balanceDue) {
+    if (
+      Math.abs(totalPaymentAmount - balanceDue) > 0.01 &&
+      totalPaymentAmount < balanceDue
+    ) {
       // Allow partial but not mismatched — this is just a warning-level check
     }
 
@@ -267,7 +301,12 @@ export class PaymentService {
       }
     }
 
-    const pricing = order.pricing as { subtotal: number; taxRate: number; taxAmount: number; total: number };
+    const pricing = order.pricing as {
+      subtotal: number;
+      taxRate: number;
+      taxAmount: number;
+      total: number;
+    };
     const taxDetails: TaxDetails = {
       subtotal: pricing.subtotal,
       taxRate: pricing.taxRate,
@@ -325,7 +364,10 @@ export class PaymentService {
       });
 
       // Add audit trail entry for split payment status change on the order
-      const existingAuditTrail = (updatedOrder.auditTrail as unknown as Array<Record<string, unknown>>) || [];
+      const existingAuditTrail =
+        (updatedOrder.auditTrail as unknown as Array<
+          Record<string, unknown>
+        >) || [];
       existingAuditTrail.push({
         action: 'order.payment_received',
         performedBy: staffId,
@@ -415,7 +457,8 @@ export class PaymentService {
     };
 
     const newTotalRefunded = totalRefunded + dto.amount;
-    const newStatus = newTotalRefunded >= paymentAmount ? 'refunded' : 'partially_refunded';
+    const newStatus =
+      newTotalRefunded >= paymentAmount ? 'refunded' : 'partially_refunded';
 
     // Update payment, order balance, create refund record, and audit log atomically
     const updatedPayment = await this.prisma.$transaction(async (tx) => {
@@ -547,7 +590,10 @@ export class PaymentService {
       offset?: number;
     },
   ) {
-    const where: Record<string, unknown> = { restaurantId: businessId, deletedAt: null };
+    const where: Record<string, unknown> = {
+      restaurantId: businessId,
+      deletedAt: null,
+    };
 
     if (options?.method) {
       where.method = options.method;
@@ -583,7 +629,10 @@ export class PaymentService {
     return { payments, total };
   }
 
-  async getPaymentSummary(businessId: string, date?: Date): Promise<{ summary: PaymentSummary }> {
+  async getPaymentSummary(
+    businessId: string,
+    date?: Date,
+  ): Promise<{ summary: PaymentSummary }> {
     const startOfDay = date
       ? new Date(new Date(date).setHours(0, 0, 0, 0))
       : new Date(new Date().setHours(0, 0, 0, 0));
@@ -617,7 +666,10 @@ export class PaymentService {
       const refunds = (payment.refunds as unknown as RefundEntry[]) || [];
       const refunded = refunds.reduce((sum, r) => sum + r.amount, 0);
 
-      if (payment.status === 'completed' || payment.status === 'partially_refunded') {
+      if (
+        payment.status === 'completed' ||
+        payment.status === 'partially_refunded'
+      ) {
         totalAmount += amount - refunded;
         byMethod[method].count += 1;
         byMethod[method].amount += amount - refunded;
@@ -668,7 +720,9 @@ export class PaymentService {
     };
 
     const receipt: Receipt = {
-      receiptNumber: (payment.receipt as { receiptNumber?: string })?.receiptNumber || this.generateReceiptNumber(),
+      receiptNumber:
+        (payment.receipt as { receiptNumber?: string })?.receiptNumber ||
+        this.generateReceiptNumber(),
       generatedAt: new Date().toISOString(),
       items: orderItems.map((item) => ({
         name: item.name,
@@ -708,7 +762,9 @@ export class PaymentService {
     }
 
     if (payment.status === 'pending') {
-      throw new BadRequestException('Cannot delete a pending payment. Cancel it first.');
+      throw new BadRequestException(
+        'Cannot delete a pending payment. Cancel it first.',
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {

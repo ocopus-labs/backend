@@ -150,7 +150,9 @@ export class DodoWebhookController {
 
       // Recoverable errors → 500 to trigger Dodo retry
       if (this.isRecoverableError(error)) {
-        this.logger.warn(`Recoverable error, returning 500 for retry: ${error.message}`);
+        this.logger.warn(
+          `Recoverable error, returning 500 for retry: ${error.message}`,
+        );
         return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
           received: true,
           error: 'Temporary failure, please retry',
@@ -196,13 +198,17 @@ export class DodoWebhookController {
         break;
 
       case 'payment.refunded':
-        this.logger.warn(`Payment refunded: ${JSON.stringify({ payment_id: data.payment_id, subscription_id: data.subscription_id })}`);
+        this.logger.warn(
+          `Payment refunded: ${JSON.stringify({ payment_id: data.payment_id, subscription_id: data.subscription_id })}`,
+        );
         break;
 
       case 'payment.dispute.created':
       case 'payment.dispute.won':
       case 'payment.dispute.lost':
-        this.logger.warn(`Payment dispute event: ${type}, data: ${JSON.stringify({ payment_id: data.payment_id, subscription_id: data.subscription_id })}`);
+        this.logger.warn(
+          `Payment dispute event: ${type}, data: ${JSON.stringify({ payment_id: data.payment_id, subscription_id: data.subscription_id })}`,
+        );
         break;
 
       default:
@@ -279,7 +285,8 @@ export class DodoWebhookController {
    * Handle payment.succeeded event
    */
   private async handlePaymentSucceeded(data: DodoWebhookPayload['data']) {
-    const { subscription_id, created_at, expires_at, metadata, payment_id } = data;
+    const { subscription_id, created_at, expires_at, metadata, payment_id } =
+      data;
 
     // Check if this is a customer order payment (not a subscription)
     if (metadata?.payment_type === 'customer_order') {
@@ -316,7 +323,9 @@ export class DodoWebhookController {
       return;
     }
 
-    this.logger.log(`Processing order payment: order=${order_number}, dodoPayment=${paymentId}`);
+    this.logger.log(
+      `Processing order payment: order=${order_number}, dodoPayment=${paymentId}`,
+    );
 
     const order = await this.prisma.order.findUnique({
       where: { id: order_id },
@@ -367,7 +376,9 @@ export class DodoWebhookController {
       });
     });
 
-    this.logger.log(`Order ${order.orderNumber} marked as paid via Dodo (payment: ${paymentId})`);
+    this.logger.log(
+      `Order ${order.orderNumber} marked as paid via Dodo (payment: ${paymentId})`,
+    );
   }
 
   /**
@@ -398,7 +409,9 @@ export class DodoWebhookController {
     });
 
     if (!subscription) {
-      this.logger.warn(`Subscription not found for trialing event: ${subscription_id}`);
+      this.logger.warn(
+        `Subscription not found for trialing event: ${subscription_id}`,
+      );
       return;
     }
 
@@ -418,12 +431,21 @@ export class DodoWebhookController {
     const code = error?.code || '';
 
     // Prisma connection / timeout errors
-    if (code === 'P1001' || code === 'P1002' || code === 'P1008' || code === 'P1017') {
+    if (
+      code === 'P1001' ||
+      code === 'P1002' ||
+      code === 'P1008' ||
+      code === 'P1017'
+    ) {
       return true;
     }
 
     // Network errors
-    if (code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'ETIMEDOUT') {
+    if (
+      code === 'ECONNREFUSED' ||
+      code === 'ECONNRESET' ||
+      code === 'ETIMEDOUT'
+    ) {
       return true;
     }
 
@@ -432,7 +454,7 @@ export class DodoWebhookController {
       message.includes('timeout') ||
       message.includes('connection refused') ||
       message.includes('econnrefused') ||
-      message.includes('can\'t reach database')
+      message.includes("can't reach database")
     ) {
       return true;
     }

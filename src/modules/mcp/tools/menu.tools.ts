@@ -13,7 +13,9 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
       async () => {
         const result = await ctx.menuService.getMenu(ctx.businessId);
         await ctx.audit('menu.read', 'menu', null);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -22,16 +24,29 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
       'List menu items with optional category filter and pagination',
       {
         categoryId: z.string().optional().describe('Filter by category ID'),
-        limit: z.number().min(1).max(100).default(50).describe('Number of results'),
+        limit: z
+          .number()
+          .min(1)
+          .max(100)
+          .default(50)
+          .describe('Number of results'),
         offset: z.number().min(0).default(0).describe('Pagination offset'),
       },
       async (params) => {
-        const result = await ctx.menuService.getItems(ctx.businessId, params.categoryId, {
-          limit: params.limit,
-          offset: params.offset,
+        const result = await ctx.menuService.getItems(
+          ctx.businessId,
+          params.categoryId,
+          {
+            limit: params.limit,
+            offset: params.offset,
+          },
+        );
+        await ctx.audit('menu.list_items', 'menu', null, {
+          categoryId: params.categoryId,
         });
-        await ctx.audit('menu.list_items', 'menu', null, { categoryId: params.categoryId });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -40,22 +55,24 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
       'Get details of a specific menu item',
       { itemId: z.string().describe('The menu item ID') },
       async ({ itemId }) => {
-        const result = await ctx.menuService.getItemById(ctx.businessId, itemId);
+        const result = await ctx.menuService.getItemById(
+          ctx.businessId,
+          itemId,
+        );
         await ctx.audit('menu.read_item', 'menu', itemId);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
-    server.tool(
-      'list-categories',
-      'List all menu categories',
-      {},
-      async () => {
-        const result = await ctx.menuService.getCategories(ctx.businessId);
-        await ctx.audit('menu.list_categories', 'menu', null);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-      },
-    );
+    server.tool('list-categories', 'List all menu categories', {}, async () => {
+      const result = await ctx.menuService.getCategories(ctx.businessId);
+      await ctx.audit('menu.list_categories', 'menu', null);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    });
   }
 
   if (ctx.hasPermission('catalog:update')) {
@@ -70,7 +87,9 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
           ctx.userId,
         );
         await ctx.audit('menu.toggle_availability', 'menu', itemId);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -89,7 +108,9 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
           ctx.userId,
         );
         await ctx.audit('menu.update_price', 'menu', itemId, { price });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
   }

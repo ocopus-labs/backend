@@ -21,7 +21,8 @@ export class DodoService {
     const apiKey = this.configService.get<string>('DODO_API_KEY');
     this.webhookSecret =
       this.configService.get<string>('DODO_WEBHOOK_SECRET') || '';
-    const isTestMode = this.configService.get<string>('DODO_TEST_MODE') === 'true';
+    const isTestMode =
+      this.configService.get<string>('DODO_TEST_MODE') === 'true';
 
     if (!apiKey) {
       this.logger.warn('DODO_API_KEY not configured - Dodo payments disabled');
@@ -33,15 +34,21 @@ export class DodoService {
       webhookKey: this.webhookSecret,
     });
 
-    this.logger.log(`Dodo Payments initialized in ${isTestMode ? 'TEST' : 'LIVE'} mode`);
-    this.logger.log(`Webhook key configured: ${this.webhookSecret ? 'yes' : 'no'}`);
+    this.logger.log(
+      `Dodo Payments initialized in ${isTestMode ? 'TEST' : 'LIVE'} mode`,
+    );
+    this.logger.log(
+      `Webhook key configured: ${this.webhookSecret ? 'yes' : 'no'}`,
+    );
   }
 
   /**
    * Create a checkout session for subscription
    */
   async createCheckoutSession(params: CreateCheckoutParams) {
-    this.logger.log(`Creating checkout session for product ${params.productId}`);
+    this.logger.log(
+      `Creating checkout session for product ${params.productId}`,
+    );
 
     const checkoutParams: any = {
       product_cart: [
@@ -189,7 +196,9 @@ export class DodoService {
   }) {
     const productId = this.configService.get<string>('DODO_ORDER_PRODUCT_ID');
     if (!productId) {
-      this.logger.warn('DODO_ORDER_PRODUCT_ID not configured — order payments via Dodo disabled');
+      this.logger.warn(
+        'DODO_ORDER_PRODUCT_ID not configured — order payments via Dodo disabled',
+      );
       return null;
     }
 

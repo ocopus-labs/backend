@@ -2,7 +2,11 @@ import { InventoryItem as PrismaInventoryItem } from '@prisma/client';
 
 export type InventoryItem = PrismaInventoryItem;
 
-export type InventoryStatus = 'in_stock' | 'low_stock' | 'out_of_stock' | 'discontinued';
+export type InventoryStatus =
+  | 'in_stock'
+  | 'low_stock'
+  | 'out_of_stock'
+  | 'discontinued';
 
 export const INVENTORY_STATUSES: Record<string, InventoryStatus> = {
   IN_STOCK: 'in_stock',
@@ -11,7 +15,12 @@ export const INVENTORY_STATUSES: Record<string, InventoryStatus> = {
   DISCONTINUED: 'discontinued',
 };
 
-export type TransactionType = 'add' | 'remove' | 'adjust' | 'waste' | 'transfer';
+export type TransactionType =
+  | 'add'
+  | 'remove'
+  | 'adjust'
+  | 'waste'
+  | 'transfer';
 
 export const TRANSACTION_TYPES: Record<string, TransactionType> = {
   ADD: 'add',

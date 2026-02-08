@@ -56,16 +56,10 @@ export class AnnouncementService {
     const announcements = await this.prisma.announcement.findMany({
       where: {
         isActive: true,
-        OR: [
-          { publishAt: null },
-          { publishAt: { lte: now } },
-        ],
+        OR: [{ publishAt: null }, { publishAt: { lte: now } }],
         AND: [
           {
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: now } },
-            ],
+            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
           },
         ],
         // Exclude dismissed announcements for this user
@@ -77,10 +71,7 @@ export class AnnouncementService {
           },
         },
       },
-      orderBy: [
-        { isPinned: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
       include: {
         creator: {
           select: {
@@ -96,7 +87,11 @@ export class AnnouncementService {
       if (announcement.target === 'all') return true;
 
       if (announcement.target === 'business_owners') {
-        return userRole === 'restaurant_owner' || userRole === 'franchise_owner' || userRole === 'super_admin';
+        return (
+          userRole === 'restaurant_owner' ||
+          userRole === 'franchise_owner' ||
+          userRole === 'super_admin'
+        );
       }
 
       if (announcement.target === 'staff') {
@@ -142,7 +137,9 @@ export class AnnouncementService {
       },
     });
 
-    this.logger.log(`Announcement created: "${announcement.title}" by user ${adminUserId}`);
+    this.logger.log(
+      `Announcement created: "${announcement.title}" by user ${adminUserId}`,
+    );
     return announcement;
   }
 
@@ -150,7 +147,9 @@ export class AnnouncementService {
    * Update an announcement
    */
   async update(id: string, dto: UpdateAnnouncementDto) {
-    const existing = await this.prisma.announcement.findUnique({ where: { id } });
+    const existing = await this.prisma.announcement.findUnique({
+      where: { id },
+    });
     if (!existing) {
       throw new NotFoundException(`Announcement with ID ${id} not found`);
     }
@@ -162,8 +161,10 @@ export class AnnouncementService {
     if (dto.target !== undefined) data.target = dto.target;
     if (dto.targetMeta !== undefined) data.targetMeta = dto.targetMeta;
     if (dto.isPinned !== undefined) data.isPinned = dto.isPinned;
-    if (dto.publishAt !== undefined) data.publishAt = dto.publishAt ? new Date(dto.publishAt) : null;
-    if (dto.expiresAt !== undefined) data.expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
+    if (dto.publishAt !== undefined)
+      data.publishAt = dto.publishAt ? new Date(dto.publishAt) : null;
+    if (dto.expiresAt !== undefined)
+      data.expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
 
     const announcement = await this.prisma.announcement.update({
       where: { id },
@@ -190,7 +191,9 @@ export class AnnouncementService {
    * Delete an announcement
    */
   async remove(id: string) {
-    const existing = await this.prisma.announcement.findUnique({ where: { id } });
+    const existing = await this.prisma.announcement.findUnique({
+      where: { id },
+    });
     if (!existing) {
       throw new NotFoundException(`Announcement with ID ${id} not found`);
     }
@@ -204,7 +207,9 @@ export class AnnouncementService {
    * Toggle isActive status
    */
   async togglePublish(id: string) {
-    const existing = await this.prisma.announcement.findUnique({ where: { id } });
+    const existing = await this.prisma.announcement.findUnique({
+      where: { id },
+    });
     if (!existing) {
       throw new NotFoundException(`Announcement with ID ${id} not found`);
     }
@@ -240,7 +245,9 @@ export class AnnouncementService {
       where: { id: announcementId },
     });
     if (!announcement) {
-      throw new NotFoundException(`Announcement with ID ${announcementId} not found`);
+      throw new NotFoundException(
+        `Announcement with ID ${announcementId} not found`,
+      );
     }
 
     await this.prisma.announcementDismissal.upsert({

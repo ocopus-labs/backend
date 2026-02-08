@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import { CreateInventoryItemDto, UpdateInventoryItemDto, StockTransactionDto } from './dto';
+import {
+  CreateInventoryItemDto,
+  UpdateInventoryItemDto,
+  StockTransactionDto,
+} from './dto';
 import {
   InventoryItem,
   InventoryStatus,
@@ -65,12 +69,22 @@ export class InventoryService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'CREATE', 'inventory', item.id, {
-      name: item.name,
-      sku: item.sku,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'CREATE',
+      'inventory',
+      item.id,
+      {
+        name: item.name,
+        sku: item.sku,
+      },
+      context,
+    );
 
-    this.logger.log(`Inventory item ${item.name} created for restaurant ${restaurantId}`);
+    this.logger.log(
+      `Inventory item ${item.name} created for restaurant ${restaurantId}`,
+    );
 
     return item;
   }
@@ -92,7 +106,9 @@ export class InventoryService {
     if (options?.status) where.status = options.status;
     if (options?.isActive !== undefined) where.isActive = options.isActive;
     if (options?.lowStock) {
-      where.status = { in: [INVENTORY_STATUSES.LOW_STOCK, INVENTORY_STATUSES.OUT_OF_STOCK] };
+      where.status = {
+        in: [INVENTORY_STATUSES.LOW_STOCK, INVENTORY_STATUSES.OUT_OF_STOCK],
+      };
     }
 
     const [items, total] = await this.prisma.$transaction([
@@ -108,13 +124,19 @@ export class InventoryService {
     return { items, total };
   }
 
-  async findById(restaurantId: string, id: string): Promise<InventoryItem | null> {
+  async findById(
+    restaurantId: string,
+    id: string,
+  ): Promise<InventoryItem | null> {
     return this.prisma.inventoryItem.findFirst({
       where: { id, restaurantId },
     });
   }
 
-  async findByIdOrFail(restaurantId: string, id: string): Promise<InventoryItem> {
+  async findByIdOrFail(
+    restaurantId: string,
+    id: string,
+  ): Promise<InventoryItem> {
     const item = await this.findById(restaurantId, id);
     if (!item) {
       throw new NotFoundException(`Inventory item with ID ${id} not found`);
@@ -122,7 +144,10 @@ export class InventoryService {
     return item;
   }
 
-  async findBySku(restaurantId: string, sku: string): Promise<InventoryItem | null> {
+  async findBySku(
+    restaurantId: string,
+    sku: string,
+  ): Promise<InventoryItem | null> {
     return this.prisma.inventoryItem.findUnique({
       where: { restaurantId_sku: { restaurantId, sku } },
     });
@@ -173,9 +198,17 @@ export class InventoryService {
       data: updateData,
     });
 
-    await this.createAuditLog(restaurantId, userId, 'UPDATE', 'inventory', id, {
-      updatedFields: Object.keys(dto),
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'UPDATE',
+      'inventory',
+      id,
+      {
+        updatedFields: Object.keys(dto),
+      },
+      context,
+    );
 
     return item;
   }
@@ -231,7 +264,10 @@ export class InventoryService {
 
     // Check for low stock alert
     const alerts = (item.alerts || []) as object[];
-    if (status === INVENTORY_STATUSES.LOW_STOCK && item.status !== INVENTORY_STATUSES.LOW_STOCK) {
+    if (
+      status === INVENTORY_STATUSES.LOW_STOCK &&
+      item.status !== INVENTORY_STATUSES.LOW_STOCK
+    ) {
       const alert: InventoryAlert = {
         type: 'low_stock',
         message: `${item.name} is running low. Current stock: ${newStock} ${item.unit}`,
@@ -257,7 +293,7 @@ export class InventoryService {
           totalValue,
           status,
           transactions: [...existingTransactions, transaction] as object[],
-          alerts: alerts as object[],
+          alerts: alerts,
         },
       });
 
@@ -279,12 +315,20 @@ export class InventoryService {
       return updated;
     });
 
-    await this.createAuditLog(restaurantId, userId, 'STOCK_TRANSACTION', 'inventory', id, {
-      type: dto.type,
-      quantity: dto.quantity,
-      previousStock,
-      newStock,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'STOCK_TRANSACTION',
+      'inventory',
+      id,
+      {
+        type: dto.type,
+        quantity: dto.quantity,
+        previousStock,
+        newStock,
+      },
+      context,
+    );
 
     this.logger.log(
       `Stock ${dto.type} for ${item.name}: ${previousStock} -> ${newStock}`,
@@ -298,13 +342,18 @@ export class InventoryService {
       where: {
         restaurantId,
         isActive: true,
-        status: { in: [INVENTORY_STATUSES.LOW_STOCK, INVENTORY_STATUSES.OUT_OF_STOCK] },
+        status: {
+          in: [INVENTORY_STATUSES.LOW_STOCK, INVENTORY_STATUSES.OUT_OF_STOCK],
+        },
       },
       orderBy: { currentStock: 'asc' },
     });
   }
 
-  async getExpiringItems(restaurantId: string, daysAhead: number = 7): Promise<InventoryItem[]> {
+  async getExpiringItems(
+    restaurantId: string,
+    daysAhead: number = 7,
+  ): Promise<InventoryItem[]> {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + daysAhead);
 
@@ -344,7 +393,8 @@ export class InventoryService {
     for (const item of items) {
       if (item.isActive) stats.activeItems++;
       if (item.status === INVENTORY_STATUSES.LOW_STOCK) stats.lowStockCount++;
-      if (item.status === INVENTORY_STATUSES.OUT_OF_STOCK) stats.outOfStockCount++;
+      if (item.status === INVENTORY_STATUSES.OUT_OF_STOCK)
+        stats.outOfStockCount++;
       stats.totalValue += Number(item.totalValue);
 
       if (!stats.categoryBreakdown[item.category]) {
@@ -356,7 +406,12 @@ export class InventoryService {
     return stats;
   }
 
-  async delete(restaurantId: string, id: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
+  async delete(
+    restaurantId: string,
+    id: string,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
     const item = await this.findByIdOrFail(restaurantId, id);
 
     // Soft delete - just mark as inactive
@@ -365,12 +420,22 @@ export class InventoryService {
       data: { isActive: false, status: INVENTORY_STATUSES.DISCONTINUED },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'DELETE', 'inventory', id, {
-      name: item.name,
-      sku: item.sku,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'DELETE',
+      'inventory',
+      id,
+      {
+        name: item.name,
+        sku: item.sku,
+      },
+      context,
+    );
 
-    this.logger.log(`Inventory item ${item.name} deleted from restaurant ${restaurantId}`);
+    this.logger.log(
+      `Inventory item ${item.name} deleted from restaurant ${restaurantId}`,
+    );
   }
 
   async getTransactionHistory(
@@ -395,7 +460,10 @@ export class InventoryService {
     return { transactions, total };
   }
 
-  private calculateStatus(currentStock: number, minimumStock: number): InventoryStatus {
+  private calculateStatus(
+    currentStock: number,
+    minimumStock: number,
+  ): InventoryStatus {
     if (currentStock <= 0) {
       return INVENTORY_STATUSES.OUT_OF_STOCK;
     }

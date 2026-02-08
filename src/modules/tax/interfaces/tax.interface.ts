@@ -1,4 +1,9 @@
-export type TaxRegime = 'gst_india' | 'vat_eu' | 'vat_uk' | 'sales_tax_us' | 'custom';
+export type TaxRegime =
+  | 'gst_india'
+  | 'vat_eu'
+  | 'vat_uk'
+  | 'sales_tax_us'
+  | 'custom';
 
 export interface GstConfig {
   compositionScheme: boolean;

@@ -133,7 +133,8 @@ export class PlanService {
       currentPlan,
       newPlan,
       isUpgrade,
-      priceDifference: Number(newPlan.priceMonthly) - Number(currentPlan.priceMonthly),
+      priceDifference:
+        Number(newPlan.priceMonthly) - Number(currentPlan.priceMonthly),
     };
   }
 }

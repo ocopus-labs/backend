@@ -1,4 +1,7 @@
-import { BusinessUser as PrismaBusinessUser, User as PrismaUser } from '@prisma/client';
+import {
+  BusinessUser as PrismaBusinessUser,
+  User as PrismaUser,
+} from '@prisma/client';
 
 export type BusinessUser = PrismaBusinessUser;
 export type User = PrismaUser;

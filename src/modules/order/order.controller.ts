@@ -42,7 +42,13 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   @Post()
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async createOrder(
     @Param('businessId') businessId: string,
     @Body() dto: CreateOrderDto,
@@ -140,7 +146,12 @@ export class OrderController {
   }
 
   @Get('export')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async exportOrders(
     @Param('businessId') businessId: string,
     @Query('status') status?: string,
@@ -156,10 +167,23 @@ export class OrderController {
       offset: 0,
     });
 
-    const headers = ['Order #', 'Date', 'Customer', 'Type', 'Items Count', 'Subtotal', 'Tax', 'Total', 'Status', 'Payment Status'];
+    const headers = [
+      'Order #',
+      'Date',
+      'Customer',
+      'Type',
+      'Items Count',
+      'Subtotal',
+      'Tax',
+      'Total',
+      'Status',
+      'Payment Status',
+    ];
     const rows = orders.map((order: any) => [
       order.orderNumber || '',
-      order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : '',
+      order.createdAt
+        ? new Date(order.createdAt).toISOString().split('T')[0]
+        : '',
       order.customerInfo?.name || 'Walk-in',
       order.orderType || '',
       Array.isArray(order.items) ? order.items.length : 0,
@@ -206,7 +230,13 @@ export class OrderController {
   }
 
   @Patch(':orderId/status')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async updateOrderStatus(
     @Param('businessId') businessId: string,
     @Param('orderId') orderId: string,
@@ -214,69 +244,136 @@ export class OrderController {
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    return this.orderService.updateOrderStatus(businessId, orderId, session.user.id, dto);
+    return this.orderService.updateOrderStatus(
+      businessId,
+      orderId,
+      session.user.id,
+      dto,
+    );
   }
 
   @Post(':orderId/items')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async addItemsToOrder(
     @Param('businessId') businessId: string,
     @Param('orderId') orderId: string,
     @Body() dto: AddItemsToOrderDto,
     @Session() session: UserSession,
   ) {
-    return this.orderService.addItemsToOrder(businessId, orderId, session.user.id, dto);
+    return this.orderService.addItemsToOrder(
+      businessId,
+      orderId,
+      session.user.id,
+      dto,
+    );
   }
 
   @Patch(':orderId/items/quantity')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async updateItemQuantity(
     @Param('businessId') businessId: string,
     @Param('orderId') orderId: string,
     @Body() dto: UpdateItemQuantityDto,
     @Session() session: UserSession,
   ) {
-    return this.orderService.updateItemQuantity(businessId, orderId, session.user.id, dto);
+    return this.orderService.updateItemQuantity(
+      businessId,
+      orderId,
+      session.user.id,
+      dto,
+    );
   }
 
   @Patch(':orderId/items/:itemId/status')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async updateItemStatus(
     @Param('businessId') businessId: string,
     @Param('orderId') orderId: string,
     @Param('itemId') itemId: string,
-    @Body('status') status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled',
+    @Body('status')
+    status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled',
     @Session() session: UserSession,
   ) {
-    return this.orderService.updateItemStatus(businessId, orderId, session.user.id, itemId, status);
+    return this.orderService.updateItemStatus(
+      businessId,
+      orderId,
+      session.user.id,
+      itemId,
+      status,
+    );
   }
 
   @Delete(':orderId/items/:itemId')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async removeItemFromOrder(
     @Param('businessId') businessId: string,
     @Param('orderId') orderId: string,
     @Param('itemId') itemId: string,
     @Session() session: UserSession,
   ) {
-    return this.orderService.removeItemFromOrder(businessId, orderId, session.user.id, itemId);
+    return this.orderService.removeItemFromOrder(
+      businessId,
+      orderId,
+      session.user.id,
+      itemId,
+    );
   }
 
   @Post(':orderId/discount')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async applyDiscount(
     @Param('businessId') businessId: string,
     @Param('orderId') orderId: string,
     @Body() dto: ApplyDiscountDto,
     @Session() session: UserSession,
   ) {
-    return this.orderService.applyDiscount(businessId, orderId, session.user.id, dto);
+    return this.orderService.applyDiscount(
+      businessId,
+      orderId,
+      session.user.id,
+      dto,
+    );
   }
 
   @Delete(':orderId')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async softDeleteOrder(
     @Param('businessId') businessId: string,
     @Param('orderId') orderId: string,

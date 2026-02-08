@@ -5,7 +5,10 @@ export function registerMenuResource(server: McpServer, ctx: McpContext) {
   server.resource(
     'full-menu',
     'business://menu',
-    { description: 'Complete menu with all categories, items, prices, and availability' },
+    {
+      description:
+        'Complete menu with all categories, items, prices, and availability',
+    },
     async () => {
       const menu = await ctx.menuService.getMenu(ctx.businessId);
       return {

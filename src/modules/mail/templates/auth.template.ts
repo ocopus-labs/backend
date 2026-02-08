@@ -2,10 +2,7 @@
  * Authentication and Transactional Email Templates
  */
 
-import {
-  baseTemplate,
-  TemplateConfig,
-} from './base.template';
+import { baseTemplate, TemplateConfig } from './base.template';
 
 /**
  * Welcome email template
@@ -21,7 +18,6 @@ export function welcomeEmailTemplate(
   data: WelcomeEmailData,
   config?: Partial<TemplateConfig>,
 ): { html: string; text: string; subject: string } {
-
   const content = `
     <div class="section text-center">
       <div style="margin-bottom: 16px;">
@@ -41,19 +37,26 @@ export function welcomeEmailTemplate(
       </p>
     </div>
 
-    ${data.features && data.features.length > 0 ? `
+    ${
+      data.features && data.features.length > 0
+        ? `
     <div class="section">
       <h3 class="section-title">What You Can Do</h3>
       <ul style="list-style: none; padding: 0; margin: 0;">
-        ${data.features.map(feature => `
+        ${data.features
+          .map(
+            (feature) => `
         <li style="padding: 8px 0; display: flex; align-items: center;">
           <span style="color: #4f46e5; margin-right: 12px; font-size: 16px;">→</span>
           <span style="color: #374151;">${feature}</span>
         </li>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </ul>
     </div>
-    ` : `
+    `
+        : `
     <div class="section">
       <h3 class="section-title">Get Started</h3>
       <ul style="list-style: none; padding: 0; margin: 0;">
@@ -71,7 +74,8 @@ export function welcomeEmailTemplate(
         </li>
       </ul>
     </div>
-    `}
+    `
+    }
 
     <div class="section text-center mt-4">
       <a href="${data.dashboardUrl}" class="btn">
@@ -83,9 +87,13 @@ export function welcomeEmailTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Welcome to POS Platform, ${data.userName}! Let's get started.`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Welcome to POS Platform, ${data.userName}! Let's get started.`,
+    },
+    config,
+  );
 
   const text = `
 Welcome to POS Platform!
@@ -170,9 +178,13 @@ export function verificationEmailTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Verify your email address to complete your registration`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Verify your email address to complete your registration`,
+    },
+    config,
+  );
 
   const text = `
 Verify Your Email
@@ -252,17 +264,25 @@ export function passwordResetEmailTemplate(
         <strong>Didn't request this?</strong><br>
         If you didn't request a password reset, please ignore this email or contact support if you have concerns about your account security.
       </p>
-      ${data.ipAddress ? `
+      ${
+        data.ipAddress
+          ? `
       <p style="color: #6b7280; font-size: 12px; margin-top: 8px;">
         Request made from IP: ${data.ipAddress}
       </p>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Reset your password - link expires in ${expiresIn}`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Reset your password - link expires in ${expiresIn}`,
+    },
+    config,
+  );
 
   const text = `
 Reset Your Password
@@ -322,12 +342,16 @@ export function passwordChangedEmailTemplate(
         <span class="info-label">Changed At</span>
         <span class="info-value">${changedAt}</span>
       </div>
-      ${data.ipAddress ? `
+      ${
+        data.ipAddress
+          ? `
       <div class="info-row">
         <span class="info-label">IP Address</span>
         <span class="info-value" style="font-family: monospace;">${data.ipAddress}</span>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
 
     <div class="card" style="background-color: #fef2f2; border-color: #fecaca;">
@@ -345,9 +369,13 @@ export function passwordChangedEmailTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Your password was changed on ${changedAt}`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Your password was changed on ${changedAt}`,
+    },
+    config,
+  );
 
   const text = `
 Password Changed
@@ -413,18 +441,26 @@ export function notificationEmailTemplate(
       </p>
     </div>
 
-    ${data.actionUrl && data.actionText ? `
+    ${
+      data.actionUrl && data.actionText
+        ? `
     <div class="section text-center mt-4">
       <a href="${data.actionUrl}" class="btn" style="background-color: ${cfg.color};">
         ${data.actionText}
       </a>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
   `;
 
-  const html = baseTemplate(content, {
-    preheader: data.message.substring(0, 100),
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: data.message.substring(0, 100),
+    },
+    config,
+  );
 
   const text = `
 ${data.title}

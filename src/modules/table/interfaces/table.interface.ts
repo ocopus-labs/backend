@@ -56,7 +56,12 @@ export interface TableSettings {
   notes?: string;
 }
 
-export type TableStatus = 'available' | 'occupied' | 'reserved' | 'maintenance' | 'out_of_service';
+export type TableStatus =
+  | 'available'
+  | 'occupied'
+  | 'reserved'
+  | 'maintenance'
+  | 'out_of_service';
 
 export const TABLE_STATUSES: Record<string, TableStatus> = {
   AVAILABLE: 'available',

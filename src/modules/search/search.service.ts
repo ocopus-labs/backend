@@ -2,7 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 
 export interface SearchResult {
-  type: 'order' | 'menu_item' | 'team_member' | 'table' | 'expense' | 'inventory';
+  type:
+    | 'order'
+    | 'menu_item'
+    | 'team_member'
+    | 'table'
+    | 'expense'
+    | 'inventory';
   id: string;
   title: string;
   subtitle?: string;
@@ -68,9 +74,7 @@ export class SearchService {
       where: {
         restaurantId: businessId,
         deletedAt: null,
-        OR: [
-          { orderNumber: { contains: query, mode: 'insensitive' } },
-        ],
+        OR: [{ orderNumber: { contains: query, mode: 'insensitive' } }],
       },
       take: limit,
       orderBy: { createdAt: 'desc' },

@@ -64,7 +64,10 @@ export class TaxService {
         vatConfig: { ...currentTax.vatConfig, ...updates.vatConfig },
       }),
       ...(updates.salesTaxConfig && {
-        salesTaxConfig: { ...currentTax.salesTaxConfig, ...updates.salesTaxConfig },
+        salesTaxConfig: {
+          ...currentTax.salesTaxConfig,
+          ...updates.salesTaxConfig,
+        },
       }),
     };
 

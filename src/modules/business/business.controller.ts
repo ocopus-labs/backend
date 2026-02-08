@@ -24,7 +24,10 @@ import {
 } from './dto';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { Sanitize } from 'src/lib/common';
-import { BUSINESS_TYPES, BUSINESS_TYPE_CONFIG } from './config/business-types.config';
+import {
+  BUSINESS_TYPES,
+  BUSINESS_TYPE_CONFIG,
+} from './config/business-types.config';
 
 interface UserSession {
   user: {
@@ -63,7 +66,9 @@ export class BusinessController {
    */
   @Get()
   async listUserBusinesses(@Session() session: UserSession) {
-    const businesses = await this.businessService.getUserBusinesses(session.user.id);
+    const businesses = await this.businessService.getUserBusinesses(
+      session.user.id,
+    );
     return { businesses };
   }
 
@@ -84,11 +89,11 @@ export class BusinessController {
    * Get business by ID
    */
   @Get(':id')
-  async getById(
-    @Param('id') id: string,
-    @Session() session: UserSession,
-  ) {
-    const hasAccess = await this.businessService.checkUserAccess(session.user.id, id);
+  async getById(@Param('id') id: string, @Session() session: UserSession) {
+    const hasAccess = await this.businessService.checkUserAccess(
+      session.user.id,
+      id,
+    );
     if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this business');
     }
@@ -115,12 +120,18 @@ export class BusinessController {
       throw new ForbiddenException('Business not found');
     }
 
-    const hasAccess = await this.businessService.checkUserAccess(session.user.id, business.id);
+    const hasAccess = await this.businessService.checkUserAccess(
+      session.user.id,
+      business.id,
+    );
     if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this business');
     }
 
-    const role = await this.businessService.getUserRole(session.user.id, business.id);
+    const role = await this.businessService.getUserRole(
+      session.user.id,
+      business.id,
+    );
 
     return {
       business,
@@ -143,7 +154,11 @@ export class BusinessController {
       USER_ROLES.SUPER_ADMIN,
     ]);
 
-    const business = await this.businessService.update(id, dto, session.user.id);
+    const business = await this.businessService.update(
+      id,
+      dto,
+      session.user.id,
+    );
     return {
       message: 'Business updated successfully',
       business,
@@ -165,7 +180,11 @@ export class BusinessController {
       USER_ROLES.MANAGER,
     ]);
 
-    const business = await this.businessService.updateSettings(id, dto, session.user.id);
+    const business = await this.businessService.updateSettings(
+      id,
+      dto,
+      session.user.id,
+    );
     return {
       message: 'Settings updated successfully',
       business,
@@ -186,7 +205,11 @@ export class BusinessController {
       USER_ROLES.FRANCHISE_OWNER,
     ]);
 
-    const business = await this.businessService.updateLogo(id, dto.logo, session.user.id);
+    const business = await this.businessService.updateLogo(
+      id,
+      dto.logo,
+      session.user.id,
+    );
     return {
       message: 'Logo updated successfully',
       business,
@@ -198,10 +221,7 @@ export class BusinessController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async delete(
-    @Param('id') id: string,
-    @Session() session: UserSession,
-  ) {
+  async delete(@Param('id') id: string, @Session() session: UserSession) {
     await this.validateBusinessAccess(session.user.id, id, [
       USER_ROLES.RESTAURANT_OWNER,
       USER_ROLES.FRANCHISE_OWNER,
@@ -222,14 +242,19 @@ export class BusinessController {
     businessId: string,
     allowedRoles: string[],
   ): Promise<void> {
-    const hasAccess = await this.businessService.checkUserAccess(userId, businessId);
+    const hasAccess = await this.businessService.checkUserAccess(
+      userId,
+      businessId,
+    );
     if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this business');
     }
 
     const role = await this.businessService.getUserRole(userId, businessId);
     if (!role || !allowedRoles.includes(role)) {
-      throw new ForbiddenException('You do not have permission to perform this action');
+      throw new ForbiddenException(
+        'You do not have permission to perform this action',
+      );
     }
   }
 }

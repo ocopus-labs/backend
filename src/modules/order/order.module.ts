@@ -10,7 +10,14 @@ import { LoyaltyModule } from 'src/modules/loyalty/loyalty.module';
 import { TaxModule } from 'src/modules/tax/tax.module';
 
 @Module({
-  imports: [PrismaModule, BusinessModule, forwardRef(() => SubscriptionModule), TableModule, LoyaltyModule, TaxModule],
+  imports: [
+    PrismaModule,
+    BusinessModule,
+    forwardRef(() => SubscriptionModule),
+    TableModule,
+    LoyaltyModule,
+    TaxModule,
+  ],
   controllers: [OrderController],
   providers: [OrderService, OrderGateway],
   exports: [OrderService, OrderGateway],

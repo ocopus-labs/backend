@@ -82,11 +82,13 @@ export function invoiceEmailTemplate(
         Invoice ${data.invoiceNumber}
       </h2>
       <p class="text-muted">
-        ${isPaid
-          ? '<span class="badge badge-success">PAID</span>'
-          : data.balanceDue && data.balanceDue > 0
-            ? '<span class="badge badge-warning">PENDING</span>'
-            : ''}
+        ${
+          isPaid
+            ? '<span class="badge badge-success">PAID</span>'
+            : data.balanceDue && data.balanceDue > 0
+              ? '<span class="badge badge-warning">PENDING</span>'
+              : ''
+        }
       </p>
     </div>
 
@@ -118,18 +120,26 @@ export function invoiceEmailTemplate(
         <span class="info-label">Invoice Date</span>
         <span class="info-value">${formatDate(data.invoiceDate)}</span>
       </div>
-      ${data.dueDate ? `
+      ${
+        data.dueDate
+          ? `
       <div class="info-row">
         <span class="info-label">Due Date</span>
         <span class="info-value">${formatDate(data.dueDate)}</span>
       </div>
-      ` : ''}
-      ${data.paymentMethod ? `
+      `
+          : ''
+      }
+      ${
+        data.paymentMethod
+          ? `
       <div class="info-row">
         <span class="info-label">Payment Method</span>
         <span class="info-value">${data.paymentMethod}</span>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
 
     <div class="section">
@@ -144,14 +154,18 @@ export function invoiceEmailTemplate(
           </tr>
         </thead>
         <tbody>
-          ${data.items.map(item => `
+          ${data.items
+            .map(
+              (item) => `
           <tr>
             <td>${item.name}</td>
             <td style="text-align: center;">${item.quantity}</td>
             <td style="text-align: right;">${formatCurrency(item.unitPrice, currency)}</td>
             <td style="text-align: right;">${formatCurrency(item.total, currency)}</td>
           </tr>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </tbody>
       </table>
     </div>
@@ -161,50 +175,74 @@ export function invoiceEmailTemplate(
         <span class="info-label">Subtotal</span>
         <span class="info-value">${formatCurrency(data.subtotal, currency)}</span>
       </div>
-      ${data.taxBreakdown && data.taxBreakdown.length > 0
-        ? data.taxBreakdown.map(comp => `
+      ${
+        data.taxBreakdown && data.taxBreakdown.length > 0
+          ? data.taxBreakdown
+              .map(
+                (comp) => `
       <div class="info-row">
         <span class="info-label">${comp.name}</span>
         <span class="info-value">${formatCurrency(comp.amount, currency)}</span>
       </div>
-      `).join('')
-        : data.taxAmount && data.taxRate ? `
+      `,
+              )
+              .join('')
+          : data.taxAmount && data.taxRate
+            ? `
       <div class="info-row">
         <span class="info-label">Tax (${data.taxRate}%)</span>
         <span class="info-value">${formatCurrency(data.taxAmount, currency)}</span>
       </div>
-      ` : ''}
-      ${data.discountAmount ? `
+      `
+            : ''
+      }
+      ${
+        data.discountAmount
+          ? `
       <div class="info-row">
         <span class="info-label">${data.discountLabel || 'Discount'}</span>
         <span class="info-value" style="color: #059669;">-${formatCurrency(data.discountAmount, currency)}</span>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
       <div class="divider"></div>
       <div class="info-row" style="padding-bottom: 0;">
         <span style="font-size: 16px; font-weight: 600; color: #111827;">Total Amount</span>
         <span style="font-size: 18px; font-weight: 700; color: #111827;">${formatCurrency(data.totalAmount, currency)}</span>
       </div>
-      ${data.paidAmount !== undefined ? `
+      ${
+        data.paidAmount !== undefined
+          ? `
       <div class="info-row">
         <span class="info-label">Amount Paid</span>
         <span class="info-value" style="color: #059669;">${formatCurrency(data.paidAmount, currency)}</span>
       </div>
-      ` : ''}
-      ${data.balanceDue !== undefined && data.balanceDue > 0 ? `
+      `
+          : ''
+      }
+      ${
+        data.balanceDue !== undefined && data.balanceDue > 0
+          ? `
       <div class="info-row" style="padding-bottom: 0;">
         <span style="font-weight: 600; color: #dc2626;">Balance Due</span>
         <span style="font-weight: 600; color: #dc2626;">${formatCurrency(data.balanceDue, currency)}</span>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
 
-    ${data.notes ? `
+    ${
+      data.notes
+        ? `
     <div class="card card-accent">
       <p class="text-muted text-small" style="margin-bottom: 4px;">Notes</p>
       <p style="color: #374151; font-size: 14px;">${data.notes}</p>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="section text-center mt-4">
       <p class="text-muted" style="margin-bottom: 16px;">
@@ -213,9 +251,13 @@ export function invoiceEmailTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Invoice ${data.invoiceNumber} from ${data.businessName}`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Invoice ${data.invoiceNumber} from ${data.businessName}`,
+    },
+    config,
+  );
 
   const text = `
 Invoice ${data.invoiceNumber}
@@ -236,10 +278,10 @@ ${data.dueDate ? `Due Date: ${formatDate(data.dueDate)}` : ''}
 ${data.paymentMethod ? `Payment Method: ${data.paymentMethod}` : ''}
 
 Items:
-${data.items.map(item => `- ${item.name} x${item.quantity} @ ${formatCurrency(item.unitPrice, currency)} = ${formatCurrency(item.total, currency)}`).join('\n')}
+${data.items.map((item) => `- ${item.name} x${item.quantity} @ ${formatCurrency(item.unitPrice, currency)} = ${formatCurrency(item.total, currency)}`).join('\n')}
 
 Subtotal: ${formatCurrency(data.subtotal, currency)}
-${data.taxBreakdown && data.taxBreakdown.length > 0 ? data.taxBreakdown.map(comp => `${comp.name}: ${formatCurrency(comp.amount, currency)}`).join('\n') : data.taxAmount && data.taxRate ? `Tax (${data.taxRate}%): ${formatCurrency(data.taxAmount, currency)}` : ''}
+${data.taxBreakdown && data.taxBreakdown.length > 0 ? data.taxBreakdown.map((comp) => `${comp.name}: ${formatCurrency(comp.amount, currency)}`).join('\n') : data.taxAmount && data.taxRate ? `Tax (${data.taxRate}%): ${formatCurrency(data.taxAmount, currency)}` : ''}
 ${data.discountAmount ? `Discount: -${formatCurrency(data.discountAmount, currency)}` : ''}
 Total: ${formatCurrency(data.totalAmount, currency)}
 ${data.paidAmount !== undefined ? `Paid: ${formatCurrency(data.paidAmount, currency)}` : ''}
@@ -308,18 +350,26 @@ export function paymentReceiptTemplate(
         <span class="info-label">Payment Date</span>
         <span class="info-value">${formatDate(data.paymentDate)}</span>
       </div>
-      ${data.invoiceNumber ? `
+      ${
+        data.invoiceNumber
+          ? `
       <div class="info-row">
         <span class="info-label">Invoice</span>
         <span class="info-value">${data.invoiceNumber}</span>
       </div>
-      ` : ''}
-      ${data.transactionId ? `
+      `
+          : ''
+      }
+      ${
+        data.transactionId
+          ? `
       <div class="info-row">
         <span class="info-label">Transaction ID</span>
         <span class="info-value" style="font-family: monospace; font-size: 13px;">${data.transactionId}</span>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
       <div class="info-row">
         <span class="info-label">Business</span>
         <span class="info-value">${data.businessName}</span>
@@ -334,9 +384,13 @@ export function paymentReceiptTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Payment of ${formatCurrency(data.amount, currency)} received - Receipt ${data.receiptNumber}`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Payment of ${formatCurrency(data.amount, currency)} received - Receipt ${data.receiptNumber}`,
+    },
+    config,
+  );
 
   const text = `
 Payment Received

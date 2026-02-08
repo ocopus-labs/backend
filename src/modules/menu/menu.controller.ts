@@ -55,13 +55,21 @@ export class MenuController {
 
   @Post('publish')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async publishMenu(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const menu = await this.menuService.publishMenu(businessId, session.user.id);
+    const menu = await this.menuService.publishMenu(
+      businessId,
+      session.user.id,
+    );
     return {
       message: 'Menu published successfully',
       menu,
@@ -85,22 +93,35 @@ export class MenuController {
     @Param('categoryId') categoryId: string,
     @Session() session: UserSession,
   ) {
-    const category = await this.menuService.getCategoryById(businessId, categoryId);
+    const category = await this.menuService.getCategoryById(
+      businessId,
+      categoryId,
+    );
     return { category };
   }
 
   @Post('categories')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async createCategory(
     @Param('businessId') businessId: string,
     @Body() dto: CreateCategoryDto,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const category = await this.menuService.createCategory(businessId, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const category = await this.menuService.createCategory(
+      businessId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
     return {
       message: 'Category created successfully',
       category,
@@ -108,7 +129,12 @@ export class MenuController {
   }
 
   @Patch('categories/:categoryId')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async updateCategory(
     @Param('businessId') businessId: string,
     @Param('categoryId') categoryId: string,
@@ -116,10 +142,16 @@ export class MenuController {
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const category = await this.menuService.updateCategory(businessId, categoryId, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const category = await this.menuService.updateCategory(
+      businessId,
+      categoryId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
     return {
       message: 'Category updated successfully',
       category,
@@ -128,17 +160,27 @@ export class MenuController {
 
   @Delete('categories/:categoryId')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async deleteCategory(
     @Param('businessId') businessId: string,
     @Param('categoryId') categoryId: string,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    await this.menuService.deleteCategory(businessId, categoryId, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    await this.menuService.deleteCategory(
+      businessId,
+      categoryId,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
     return {
       message: 'Category deleted successfully',
     };
@@ -146,13 +188,22 @@ export class MenuController {
 
   @Post('categories/reorder')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async reorderCategories(
     @Param('businessId') businessId: string,
     @Body() dto: ReorderCategoriesDto,
     @Session() session: UserSession,
   ) {
-    const categories = await this.menuService.reorderCategories(businessId, dto.categoryIds, session.user.id);
+    const categories = await this.menuService.reorderCategories(
+      businessId,
+      dto.categoryIds,
+      session.user.id,
+    );
     return {
       message: 'Categories reordered successfully',
       categories,
@@ -187,17 +238,27 @@ export class MenuController {
   }
 
   @Post('items')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async createItem(
     @Param('businessId') businessId: string,
     @Body() dto: CreateMenuItemDto,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const item = await this.menuService.createItem(businessId, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const item = await this.menuService.createItem(
+      businessId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
     return {
       message: 'Menu item created successfully',
       item,
@@ -205,7 +266,12 @@ export class MenuController {
   }
 
   @Patch('items/:itemId')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async updateItem(
     @Param('businessId') businessId: string,
     @Param('itemId') itemId: string,
@@ -213,10 +279,16 @@ export class MenuController {
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const item = await this.menuService.updateItem(businessId, itemId, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const item = await this.menuService.updateItem(
+      businessId,
+      itemId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
     return {
       message: 'Menu item updated successfully',
       item,
@@ -225,7 +297,12 @@ export class MenuController {
 
   @Delete('items/:itemId')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async deleteItem(
     @Param('businessId') businessId: string,
     @Param('itemId') itemId: string,
@@ -243,13 +320,22 @@ export class MenuController {
 
   @Post('items/:itemId/toggle-availability')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async toggleItemAvailability(
     @Param('businessId') businessId: string,
     @Param('itemId') itemId: string,
     @Session() session: UserSession,
   ) {
-    const item = await this.menuService.toggleItemAvailability(businessId, itemId, session.user.id);
+    const item = await this.menuService.toggleItemAvailability(
+      businessId,
+      itemId,
+      session.user.id,
+    );
     return {
       message: `Item is now ${item.isAvailable ? 'available' : 'unavailable'}`,
       item,
@@ -258,7 +344,12 @@ export class MenuController {
 
   @Post('items/bulk-availability')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async bulkUpdateAvailability(
     @Param('businessId') businessId: string,
     @Body() body: { itemIds: string[]; isAvailable: boolean },
@@ -278,12 +369,20 @@ export class MenuController {
 
   @Post('seed-categories')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async seedDefaultCategories(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
   ) {
-    const categories = await this.menuService.seedDefaultCategories(businessId, session.user.id);
+    const categories = await this.menuService.seedDefaultCategories(
+      businessId,
+      session.user.id,
+    );
     return {
       message: 'Default categories seeded successfully',
       categories,

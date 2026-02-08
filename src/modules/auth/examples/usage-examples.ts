@@ -1,10 +1,10 @@
 /**
  * Better Auth NestJS Integration - Usage Examples
- * 
+ *
  * ⚠️ NOTE: This file is for REFERENCE ONLY and contains example patterns.
  * It is not meant to be compiled or run directly.
  * Copy the patterns you need into your actual controller/service files.
- * 
+ *
  * This file demonstrates common patterns for using Better Auth in your NestJS application.
  */
 

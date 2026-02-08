@@ -58,7 +58,10 @@ export class AdminAnnouncementController {
     @Body() dto: CreateAnnouncementDto,
     @Session() session: UserSession,
   ) {
-    const announcement = await this.announcementService.create(dto, session.user.id);
+    const announcement = await this.announcementService.create(
+      dto,
+      session.user.id,
+    );
     return { message: 'Announcement created successfully', announcement };
   }
 
@@ -67,10 +70,7 @@ export class AdminAnnouncementController {
    */
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  async update(
-    @Param('id') id: string,
-    @Body() dto: UpdateAnnouncementDto,
-  ) {
+  async update(@Param('id') id: string, @Body() dto: UpdateAnnouncementDto) {
     const announcement = await this.announcementService.update(id, dto);
     return { message: 'Announcement updated successfully', announcement };
   }
@@ -123,10 +123,7 @@ export class UserAnnouncementController {
    */
   @Post(':id/dismiss')
   @HttpCode(HttpStatus.OK)
-  async dismiss(
-    @Param('id') id: string,
-    @Session() session: UserSession,
-  ) {
+  async dismiss(@Param('id') id: string, @Session() session: UserSession) {
     return this.announcementService.dismiss(id, session.user.id);
   }
 }

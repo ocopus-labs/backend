@@ -46,7 +46,11 @@ export class TableController {
   constructor(private tableService: TableService) {}
 
   @Post()
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async create(
     @Param('businessId') businessId: string,
     @Body() dto: CreateTableDto,
@@ -118,7 +122,11 @@ export class TableController {
   }
 
   @Patch(':id')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -140,7 +148,12 @@ export class TableController {
   }
 
   @Patch(':id/status')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async updateStatus(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -162,7 +175,12 @@ export class TableController {
   }
 
   @Post(':id/session/start')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async startSession(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -184,7 +202,12 @@ export class TableController {
   }
 
   @Post(':id/session/end')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async endSession(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -204,7 +227,11 @@ export class TableController {
   }
 
   @Post(':id/maintenance')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async addMaintenanceLog(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

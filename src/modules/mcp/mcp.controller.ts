@@ -89,7 +89,10 @@ export class McpController {
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(401).json({
         jsonrpc: '2.0',
-        error: { code: -32001, message: 'Missing or invalid Authorization header' },
+        error: {
+          code: -32001,
+          message: 'Missing or invalid Authorization header',
+        },
         id: null,
       });
       return null;

@@ -77,7 +77,7 @@ export class TaxController {
   )
   async validateRegistration(@Body() dto: ValidateRegistrationDto) {
     const result = await this.taxService.validateRegistration(
-      dto.regime as TaxRegime,
+      dto.regime,
       dto.registrationNumber,
     );
     return result;

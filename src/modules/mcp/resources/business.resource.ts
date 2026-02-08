@@ -5,7 +5,10 @@ export function registerBusinessResource(server: McpServer, ctx: McpContext) {
   server.resource(
     'business-info',
     'business://info',
-    { description: 'Business details including name, type, settings, currency, and contact info' },
+    {
+      description:
+        'Business details including name, type, settings, currency, and contact info',
+    },
     async () => {
       const business = await ctx.businessService.findByIdOrFail(ctx.businessId);
       return {

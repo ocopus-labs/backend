@@ -47,7 +47,11 @@ export class TeamService {
   /**
    * Get all team members for a business
    */
-  async findAll(restaurantId: string, limit?: number, offset?: number): Promise<{ members: TeamMember[]; total: number }> {
+  async findAll(
+    restaurantId: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<{ members: TeamMember[]; total: number }> {
     const where = { restaurantId };
     const [members, total] = await this.prisma.$transaction([
       this.prisma.businessUser.findMany({
@@ -235,7 +239,8 @@ export class TeamService {
     }
 
     // Check team member limit
-    const limitCheck = await this.usageTrackingService.checkTeamMemberLimit(restaurantId);
+    const limitCheck =
+      await this.usageTrackingService.checkTeamMemberLimit(restaurantId);
     if (!limitCheck.allowed) {
       throw new ForbiddenException(
         limitCheck.message ||
@@ -268,11 +273,19 @@ export class TeamService {
       },
     });
 
-    await this.createAuditLog(restaurantId, inviterId, 'ADD_MEMBER', 'team', member.id, {
-      userId: dto.userId,
-      role: dto.role,
-      email: user.email,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      inviterId,
+      'ADD_MEMBER',
+      'team',
+      member.id,
+      {
+        userId: dto.userId,
+        role: dto.role,
+        email: user.email,
+      },
+      context,
+    );
 
     this.logger.log(`User ${user.email} added to team as ${dto.role}`);
 
@@ -298,7 +311,8 @@ export class TeamService {
     context?: { ipAddress?: string; userAgent?: string },
   ): Promise<{ invitation: { email: string; role: string; status: string } }> {
     // Check team member limit before processing invite
-    const limitCheck = await this.usageTrackingService.checkTeamMemberLimit(restaurantId);
+    const limitCheck =
+      await this.usageTrackingService.checkTeamMemberLimit(restaurantId);
     if (!limitCheck.allowed) {
       throw new ForbiddenException(
         limitCheck.message ||
@@ -350,10 +364,18 @@ export class TeamService {
     // For now, we'll just log the invitation request
     // In production, this would integrate with the mail service
 
-    await this.createAuditLog(restaurantId, inviterId, 'INVITE_MEMBER', 'team', null, {
-      email: dto.email,
-      role: dto.role,
-    }, context);
+    await this.createAuditLog(
+      restaurantId,
+      inviterId,
+      'INVITE_MEMBER',
+      'team',
+      null,
+      {
+        email: dto.email,
+        role: dto.role,
+      },
+      context,
+    );
 
     this.logger.log(`Invitation sent to ${dto.email} for role ${dto.role}`);
 
@@ -418,9 +440,16 @@ export class TeamService {
       },
     });
 
-    await this.createAuditLog(restaurantId, updaterId, 'UPDATE_MEMBER', 'team', id, {
-      updatedFields: Object.keys(dto),
-    });
+    await this.createAuditLog(
+      restaurantId,
+      updaterId,
+      'UPDATE_MEMBER',
+      'team',
+      id,
+      {
+        updatedFields: Object.keys(dto),
+      },
+    );
 
     return {
       id: member.id,
@@ -470,12 +499,21 @@ export class TeamService {
       },
     });
 
-    await this.createAuditLog(restaurantId, updaterId, 'UPDATE_ROLE', 'team', id, {
-      previousRole: existing.role,
-      newRole: dto.role,
-    });
+    await this.createAuditLog(
+      restaurantId,
+      updaterId,
+      'UPDATE_ROLE',
+      'team',
+      id,
+      {
+        previousRole: existing.role,
+        newRole: dto.role,
+      },
+    );
 
-    this.logger.log(`Member ${id} role changed from ${existing.role} to ${dto.role}`);
+    this.logger.log(
+      `Member ${id} role changed from ${existing.role} to ${dto.role}`,
+    );
 
     return {
       id: member.id,
@@ -501,7 +539,9 @@ export class TeamService {
     const existing = await this.findByIdOrFail(restaurantId, id);
 
     if (existing.role === USER_ROLES.RESTAURANT_OWNER) {
-      throw new ForbiddenException('Cannot modify the business owner permissions');
+      throw new ForbiddenException(
+        'Cannot modify the business owner permissions',
+      );
     }
 
     const member = await this.prisma.businessUser.update({
@@ -519,9 +559,16 @@ export class TeamService {
       },
     });
 
-    await this.createAuditLog(restaurantId, updaterId, 'UPDATE_PERMISSIONS', 'team', id, {
-      permissions: dto.permissions,
-    });
+    await this.createAuditLog(
+      restaurantId,
+      updaterId,
+      'UPDATE_PERMISSIONS',
+      'team',
+      id,
+      {
+        permissions: dto.permissions,
+      },
+    );
 
     return {
       id: member.id,
@@ -569,9 +616,16 @@ export class TeamService {
       },
     });
 
-    await this.createAuditLog(restaurantId, updaterId, 'SUSPEND_MEMBER', 'team', id, {
-      reason,
-    });
+    await this.createAuditLog(
+      restaurantId,
+      updaterId,
+      'SUSPEND_MEMBER',
+      'team',
+      id,
+      {
+        reason,
+      },
+    );
 
     this.logger.log(`Member ${id} suspended`);
 
@@ -616,7 +670,14 @@ export class TeamService {
       },
     });
 
-    await this.createAuditLog(restaurantId, updaterId, 'REACTIVATE_MEMBER', 'team', id, {});
+    await this.createAuditLog(
+      restaurantId,
+      updaterId,
+      'REACTIVATE_MEMBER',
+      'team',
+      id,
+      {},
+    );
 
     this.logger.log(`Member ${id} reactivated`);
 
@@ -650,10 +711,17 @@ export class TeamService {
       where: { id },
     });
 
-    await this.createAuditLog(restaurantId, removerId, 'REMOVE_MEMBER', 'team', id, {
-      userId: existing.userId,
-      role: existing.role,
-    });
+    await this.createAuditLog(
+      restaurantId,
+      removerId,
+      'REMOVE_MEMBER',
+      'team',
+      id,
+      {
+        userId: existing.userId,
+        role: existing.role,
+      },
+    );
 
     this.logger.log(`Member ${id} removed from team`);
   }
@@ -667,10 +735,13 @@ export class TeamService {
     description: string;
   }[] {
     const roleDescriptions: Record<string, string> = {
-      manager: 'Day-to-day operations, staff management (limited), order & payment processing',
-      staff: 'Basic operational access - create orders, view menu, manage tables',
+      manager:
+        'Day-to-day operations, staff management (limited), order & payment processing',
+      staff:
+        'Basic operational access - create orders, view menu, manage tables',
       viewer: 'Read-only access to business data and analytics',
-      accountant: 'Financial operations - invoices, payments, expenses, reports',
+      accountant:
+        'Financial operations - invoices, payments, expenses, reports',
     };
 
     return ASSIGNABLE_ROLES.map((role) => ({
@@ -736,7 +807,14 @@ export class TeamService {
     const businessType = (business?.type || 'restaurant') as BusinessType;
 
     // Category metadata for human-readable labels and descriptions
-    const categoryMeta: Record<string, { label: string; genericResource?: string; descriptions?: Record<string, string> }> = {
+    const categoryMeta: Record<
+      string,
+      {
+        label: string;
+        genericResource?: string;
+        descriptions?: Record<string, string>;
+      }
+    > = {
       OPERATIONS: {
         label: 'Operations',
         genericResource: 'operations',
@@ -844,32 +922,46 @@ export class TeamService {
     };
 
     // Build categories from PERMISSIONS, skipping platform/franchise/user/business-type-specific
-    const skipCategories = ['PLATFORM', 'FRANCHISE', 'USER', 'RESTAURANT', 'SALON', 'GYM'];
+    const skipCategories = [
+      'PLATFORM',
+      'FRANCHISE',
+      'USER',
+      'RESTAURANT',
+      'SALON',
+      'GYM',
+    ];
 
     const categories = Object.entries(PERMISSIONS)
       .filter(([key]) => !skipCategories.includes(key))
       .map(([categoryKey, perms]) => {
         const meta = categoryMeta[categoryKey];
-        const label = meta?.label || categoryKey.charAt(0) + categoryKey.slice(1).toLowerCase();
+        const label =
+          meta?.label ||
+          categoryKey.charAt(0) + categoryKey.slice(1).toLowerCase();
         const genericResource = meta?.genericResource;
 
         const businessLabel = genericResource
           ? getResourceLabel(businessType, genericResource)
           : undefined;
 
-        const permissions = Object.entries(perms).map(([permName, permKey]) => ({
-          key: permKey as string,
-          label: permName
-            .split('_')
-            .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
-            .join(' '),
-          description: meta?.descriptions?.[permName],
-        }));
+        const permissions = Object.entries(perms).map(
+          ([permName, permKey]) => ({
+            key: permKey as string,
+            label: permName
+              .split('_')
+              .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+              .join(' '),
+            description: meta?.descriptions?.[permName],
+          }),
+        );
 
         return {
           category: categoryKey,
           label,
-          businessLabel: businessLabel && businessLabel !== genericResource ? businessLabel : undefined,
+          businessLabel:
+            businessLabel && businessLabel !== genericResource
+              ? businessLabel
+              : undefined,
           permissions,
         };
       });

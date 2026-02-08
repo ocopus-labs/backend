@@ -157,7 +157,12 @@ export class ProcessRefundDto {
 
 export class UpdatePaymentStatusDto {
   @IsEnum(['pending', 'completed', 'failed', 'refunded', 'partially_refunded'])
-  status: 'pending' | 'completed' | 'failed' | 'refunded' | 'partially_refunded';
+  status:
+    | 'pending'
+    | 'completed'
+    | 'failed'
+    | 'refunded'
+    | 'partially_refunded';
 
   @IsOptional()
   @IsString()

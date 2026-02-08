@@ -6,8 +6,11 @@ export interface MailConfig {
   baseUrl?: string;
 }
 
-export const mailConfig = registerAs('mail', (): MailConfig => ({
-  apiKey: process.env.RESEND_API_KEY || '',
-  from: process.env.MAIL_FROM || 'noreply@example.com',
-  baseUrl: process.env.RESEND_BASE_URL || 'https://api.resend.com',
-}));
+export const mailConfig = registerAs(
+  'mail',
+  (): MailConfig => ({
+    apiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.MAIL_FROM || 'noreply@example.com',
+    baseUrl: process.env.RESEND_BASE_URL || 'https://api.resend.com',
+  }),
+);

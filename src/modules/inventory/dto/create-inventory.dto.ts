@@ -10,7 +10,12 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { INVENTORY_CATEGORIES, INVENTORY_UNITS, InventoryCategory, InventoryUnit } from '../interfaces';
+import {
+  INVENTORY_CATEGORIES,
+  INVENTORY_UNITS,
+  InventoryCategory,
+  InventoryUnit,
+} from '../interfaces';
 
 export class CreateInventoryItemDto {
   @IsString()

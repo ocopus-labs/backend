@@ -2,10 +2,7 @@
  * Subscription Email Templates
  */
 
-import {
-  baseTemplate,
-  TemplateConfig,
-} from './base.template';
+import { baseTemplate, TemplateConfig } from './base.template';
 
 export interface SubscriptionPlanInfo {
   name: string;
@@ -71,19 +68,27 @@ export function subscriptionActivatedTemplate(
       </p>
     </div>
 
-    ${data.plan.features && data.plan.features.length > 0 ? `
+    ${
+      data.plan.features && data.plan.features.length > 0
+        ? `
     <div class="section">
       <h3 class="section-title">What's Included</h3>
       <ul style="list-style: none; padding: 0; margin: 0;">
-        ${data.plan.features.map(feature => `
+        ${data.plan.features
+          .map(
+            (feature) => `
         <li style="padding: 8px 0; display: flex; align-items: center;">
           <span style="color: #059669; margin-right: 12px; font-size: 16px;">✓</span>
           <span style="color: #374151;">${feature}</span>
         </li>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </ul>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="card">
       <div class="info-row">
@@ -106,9 +111,13 @@ export function subscriptionActivatedTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Your ${data.plan.displayName} subscription is now active!`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Your ${data.plan.displayName} subscription is now active!`,
+    },
+    config,
+  );
 
   const text = `
 Welcome to ${data.plan.displayName}!
@@ -120,10 +129,14 @@ Price: ${formatCurrency(data.plan.priceMonthly, currency)}/month
 Status: Active
 Next Billing Date: ${formatDate(data.billingPeriodEnd)}
 
-${data.plan.features && data.plan.features.length > 0 ? `
+${
+  data.plan.features && data.plan.features.length > 0
+    ? `
 What's Included:
-${data.plan.features.map(f => `- ${f}`).join('\n')}
-` : ''}
+${data.plan.features.map((f) => `- ${f}`).join('\n')}
+`
+    : ''
+}
 
 Visit your dashboard: ${data.dashboardUrl}
 
@@ -203,9 +216,13 @@ export function paymentSuccessTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Payment of ${formatCurrency(data.amount, currency)} received for ${data.planName}`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Payment of ${formatCurrency(data.amount, currency)} received for ${data.planName}`,
+    },
+    config,
+  );
 
   const text = `
 Payment Successful
@@ -267,11 +284,15 @@ export function paymentFailedTemplate(
       <p style="color: #374151; margin-bottom: 8px;">
         We attempted to charge <strong>${formatCurrency(data.amount, currency)}</strong> for your <strong>${data.planName}</strong> subscription, but the payment was unsuccessful.
       </p>
-      ${data.failureReason ? `
+      ${
+        data.failureReason
+          ? `
       <p class="text-muted text-small">
         Reason: ${data.failureReason}
       </p>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
 
     <div class="card">
@@ -283,12 +304,16 @@ export function paymentFailedTemplate(
           <span style="color: #4f46e5; margin-right: 12px; font-weight: 600;">1.</span>
           <span style="color: #374151;">Update your payment method to avoid service interruption</span>
         </li>
-        ${data.retryDate ? `
+        ${
+          data.retryDate
+            ? `
         <li style="padding: 8px 0; display: flex; align-items: flex-start;">
           <span style="color: #4f46e5; margin-right: 12px; font-weight: 600;">2.</span>
           <span style="color: #374151;">We'll automatically retry the payment on ${formatDate(data.retryDate)}</span>
         </li>
-        ` : ''}
+        `
+            : ''
+        }
         <li style="padding: 8px 0; display: flex; align-items: flex-start;">
           <span style="color: #4f46e5; margin-right: 12px; font-weight: 600;">${data.retryDate ? '3' : '2'}.</span>
           <span style="color: #374151;">If payment continues to fail, your subscription will be paused</span>
@@ -306,9 +331,13 @@ export function paymentFailedTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Action required: Your ${data.planName} payment failed`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Action required: Your ${data.planName} payment failed`,
+    },
+    config,
+  );
 
   const text = `
 Payment Failed
@@ -350,7 +379,6 @@ export function subscriptionCancelledTemplate(
   data: SubscriptionCancelledData,
   config?: Partial<TemplateConfig>,
 ): { html: string; text: string; subject: string } {
-
   const content = `
     <div class="section text-center">
       <h2 style="font-size: 24px; font-weight: 600; color: #111827; margin-bottom: 8px;">
@@ -396,9 +424,13 @@ export function subscriptionCancelledTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Your ${data.planName} subscription has been cancelled`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Your ${data.planName} subscription has been cancelled`,
+    },
+    config,
+  );
 
   const text = `
 Subscription Cancelled
@@ -443,7 +475,10 @@ export function trialEndingTemplate(
   config?: Partial<TemplateConfig>,
 ): { html: string; text: string; subject: string } {
   const currency = data.currency || 'INR';
-  const daysLeft = Math.ceil((new Date(data.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const daysLeft = Math.ceil(
+    (new Date(data.trialEndDate).getTime() - Date.now()) /
+      (1000 * 60 * 60 * 24),
+  );
 
   const content = `
     <div class="section text-center">
@@ -465,19 +500,28 @@ export function trialEndingTemplate(
       </p>
     </div>
 
-    ${data.features && data.features.length > 0 ? `
+    ${
+      data.features && data.features.length > 0
+        ? `
     <div class="section">
       <h3 class="section-title">Keep These Features</h3>
       <ul style="list-style: none; padding: 0; margin: 0;">
-        ${data.features.slice(0, 5).map(feature => `
+        ${data.features
+          .slice(0, 5)
+          .map(
+            (feature) => `
         <li style="padding: 8px 0; display: flex; align-items: center;">
           <span style="color: #059669; margin-right: 12px; font-size: 16px;">✓</span>
           <span style="color: #374151;">${feature}</span>
         </li>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </ul>
     </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="card" style="text-align: center; background-color: #f0fdf4;">
       <p style="font-size: 14px; color: #374151; margin-bottom: 8px;">
@@ -498,9 +542,13 @@ export function trialEndingTemplate(
     </div>
   `;
 
-  const html = baseTemplate(content, {
-    preheader: `Your ${data.planName} trial ends ${daysLeft === 1 ? 'tomorrow' : `in ${daysLeft} days`} - upgrade now!`,
-  }, config);
+  const html = baseTemplate(
+    content,
+    {
+      preheader: `Your ${data.planName} trial ends ${daysLeft === 1 ? 'tomorrow' : `in ${daysLeft} days`} - upgrade now!`,
+    },
+    config,
+  );
 
   const text = `
 Your Trial Ends ${daysLeft === 1 ? 'Tomorrow' : `in ${daysLeft} Days`}
@@ -509,10 +557,17 @@ Hi ${data.userName}, don't lose access to ${data.planName}!
 
 Trial Ends On: ${formatDate(data.trialEndDate)}
 
-${data.features && data.features.length > 0 ? `
+${
+  data.features && data.features.length > 0
+    ? `
 Keep These Features:
-${data.features.slice(0, 5).map(f => `- ${f}`).join('\n')}
-` : ''}
+${data.features
+  .slice(0, 5)
+  .map((f) => `- ${f}`)
+  .join('\n')}
+`
+    : ''
+}
 
 Continue with ${data.planName} for just ${formatCurrency(data.priceMonthly, currency)}/month
 

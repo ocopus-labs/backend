@@ -59,16 +59,30 @@ export class TeamController {
     const parsedOffset = offset ? parseInt(offset, 10) : undefined;
 
     if (status) {
-      const result = await this.teamService.findByStatus(businessId, status, parsedLimit, parsedOffset);
+      const result = await this.teamService.findByStatus(
+        businessId,
+        status,
+        parsedLimit,
+        parsedOffset,
+      );
       return result;
     }
 
-    const result = await this.teamService.findAll(businessId, parsedLimit, parsedOffset);
+    const result = await this.teamService.findAll(
+      businessId,
+      parsedLimit,
+      parsedOffset,
+    );
     return result;
   }
 
   @Get('export')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async exportTeam(
     @Param('businessId') businessId: string,
     @Res() res?: Response,
@@ -94,7 +108,11 @@ export class TeamController {
   }
 
   @Get('stats')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async getStats(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -132,7 +150,11 @@ export class TeamController {
   }
 
   @Post('invite')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async invite(
     @Param('businessId') businessId: string,
     @Body() dto: InviteTeamMemberDto,
@@ -147,15 +169,20 @@ export class TeamController {
     );
 
     return {
-      message: result.invitation.status === 'added'
-        ? 'User added to team successfully'
-        : 'Invitation sent successfully',
+      message:
+        result.invitation.status === 'added'
+          ? 'User added to team successfully'
+          : 'Invitation sent successfully',
       ...result,
     };
   }
 
   @Post('add')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async addExistingUser(
     @Param('businessId') businessId: string,
     @Body() dto: AddExistingUserDto,
@@ -176,7 +203,11 @@ export class TeamController {
   }
 
   @Patch(':id')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

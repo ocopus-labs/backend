@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsObject, IsUrl, ValidateIf } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsObject,
+  IsUrl,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateBusinessSettingsDto {
   @IsString()
@@ -15,7 +22,10 @@ export class UpdateBusinessSettingsDto {
 
   @IsObject()
   @IsOptional()
-  businessHours?: Record<string, { open: string; close: string; isClosed?: boolean }>;
+  businessHours?: Record<
+    string,
+    { open: string; close: string; isClosed?: boolean }
+  >;
 
   @IsObject()
   @IsOptional()

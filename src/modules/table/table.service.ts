@@ -69,9 +69,16 @@ export class TableService {
       },
     });
 
-    await this.createAuditLog(restaurantId, userId, 'CREATE', 'table', table.id, {
-      tableNumber: table.tableNumber,
-    });
+    await this.createAuditLog(
+      restaurantId,
+      userId,
+      'CREATE',
+      'table',
+      table.id,
+      {
+        tableNumber: table.tableNumber,
+      },
+    );
 
     this.logger.log(
       `Table ${table.tableNumber} created for restaurant ${restaurantId}`,
@@ -283,11 +290,16 @@ export class TableService {
 
     // Idempotent: if table is already available with no session, just return it
     if (table.status === TABLE_STATUSES.AVAILABLE && !table.currentSession) {
-      this.logger.log(`Table ${table.tableNumber} already available, skipping endSession`);
+      this.logger.log(
+        `Table ${table.tableNumber} already available, skipping endSession`,
+      );
       return table;
     }
 
-    const currentSession = table.currentSession as Record<string, unknown> | null;
+    const currentSession = table.currentSession as Record<
+      string,
+      unknown
+    > | null;
 
     const updatedTable = await this.prisma.table.update({
       where: { id },
@@ -371,25 +383,20 @@ export class TableService {
     });
 
     if (activeOrders > 0) {
-      throw new BadRequestException(
-        'Cannot delete table with active orders',
-      );
+      throw new BadRequestException('Cannot delete table with active orders');
     }
 
     await this.prisma.table.delete({
       where: { id },
     });
 
-    await this.createAuditLog(
-      restaurantId,
-      userId,
-      'DELETE',
-      'table',
-      id,
-      { tableNumber: table.tableNumber },
-    );
+    await this.createAuditLog(restaurantId, userId, 'DELETE', 'table', id, {
+      tableNumber: table.tableNumber,
+    });
 
-    this.logger.log(`Table ${table.tableNumber} deleted from restaurant ${restaurantId}`);
+    this.logger.log(
+      `Table ${table.tableNumber} deleted from restaurant ${restaurantId}`,
+    );
   }
 
   async getTableStats(restaurantId: string): Promise<{

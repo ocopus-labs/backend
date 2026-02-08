@@ -8,7 +8,10 @@ import {
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { randomBytes, createHash } from 'crypto';
 import { CreateApiKeyDto } from './dto';
-import { getRolePermissions, type UserRole } from 'src/lib/auth/roles.constants';
+import {
+  getRolePermissions,
+  type UserRole,
+} from 'src/lib/auth/roles.constants';
 
 const KEY_PREFIX = 'pos_k_';
 const MAX_KEYS_DEFAULT = 5;
@@ -128,7 +131,9 @@ export class ApiKeyService {
         where: { id: apiKey.id },
         data: { lastUsedAt: new Date() },
       })
-      .catch((err) => this.logger.warn(`Failed to update lastUsedAt: ${err.message}`));
+      .catch((err) =>
+        this.logger.warn(`Failed to update lastUsedAt: ${err.message}`),
+      );
 
     return {
       id: apiKey.id,

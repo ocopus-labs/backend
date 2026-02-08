@@ -115,7 +115,9 @@ export class McpService implements OnModuleDestroy {
       if (entry) {
         // Verify the session belongs to the same API key
         if (entry.apiKeyId !== apiKeyContext.id) {
-          res.status(403).json({ error: 'Session does not belong to this API key' });
+          res
+            .status(403)
+            .json({ error: 'Session does not belong to this API key' });
           return;
         }
         entry.lastActivity = Date.now();
@@ -152,7 +154,8 @@ export class McpService implements OnModuleDestroy {
       jsonrpc: '2.0',
       error: {
         code: -32600,
-        message: 'Bad Request: No valid session. Send an initialize request first.',
+        message:
+          'Bad Request: No valid session. Send an initialize request first.',
       },
       id: null,
     });
@@ -164,7 +167,7 @@ export class McpService implements OnModuleDestroy {
       res.status(400).json({ error: 'Invalid or missing session' });
       return;
     }
-    const entry = this.sessions.get(sessionId)!;
+    const entry = this.sessions.get(sessionId);
     entry.lastActivity = Date.now();
     await entry.transport.handleRequest(req, res);
   }
@@ -172,7 +175,7 @@ export class McpService implements OnModuleDestroy {
   async handleDeleteRequest(req: any, res: any): Promise<void> {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     if (sessionId && this.sessions.has(sessionId)) {
-      const entry = this.sessions.get(sessionId)!;
+      const entry = this.sessions.get(sessionId);
       await entry.server.close();
       this.sessions.delete(sessionId);
       this.logger.log(`MCP session closed: ${sessionId}`);
@@ -257,7 +260,9 @@ export class McpService implements OnModuleDestroy {
             },
           });
         } catch (err) {
-          self.logger.warn(`Failed to create audit log: ${(err as Error).message}`);
+          self.logger.warn(
+            `Failed to create audit log: ${(err as Error).message}`,
+          );
         }
       },
 

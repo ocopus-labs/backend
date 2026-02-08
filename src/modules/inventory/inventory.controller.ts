@@ -19,7 +19,11 @@ import {
 import { Response } from 'express';
 import { Session } from '@thallesp/nestjs-better-auth';
 import { InventoryService } from './inventory.service';
-import { CreateInventoryItemDto, UpdateInventoryItemDto, StockTransactionDto } from './dto';
+import {
+  CreateInventoryItemDto,
+  UpdateInventoryItemDto,
+  StockTransactionDto,
+} from './dto';
 import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { InventoryStatus } from './interfaces';
@@ -42,17 +46,26 @@ export class InventoryController {
   constructor(private inventoryService: InventoryService) {}
 
   @Post()
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async create(
     @Param('businessId') businessId: string,
     @Body() dto: CreateInventoryItemDto,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const item = await this.inventoryService.create(businessId, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const item = await this.inventoryService.create(
+      businessId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
 
     return {
       message: 'Inventory item created successfully',
@@ -84,7 +97,12 @@ export class InventoryController {
   }
 
   @Get('export')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async exportInventory(
     @Param('businessId') businessId: string,
     @Query('category') category?: string,
@@ -99,7 +117,17 @@ export class InventoryController {
     });
 
     const items = result.items || [];
-    const headers = ['SKU', 'Name', 'Category', 'Current Stock', 'Min Stock', 'Unit', 'Cost/Unit', 'Total Value', 'Status'];
+    const headers = [
+      'SKU',
+      'Name',
+      'Category',
+      'Current Stock',
+      'Min Stock',
+      'Unit',
+      'Cost/Unit',
+      'Total Value',
+      'Status',
+    ];
     const rows = items.map((item: any) => [
       item.sku || '',
       item.name || '',
@@ -109,7 +137,8 @@ export class InventoryController {
       item.unit || '',
       item.costPerUnit ?? 0,
       ((item.currentStock ?? 0) * (item.costPerUnit ?? 0)).toFixed(2),
-      item.status || (item.currentStock < item.minimumStock ? 'low_stock' : 'in_stock'),
+      item.status ||
+        (item.currentStock < item.minimumStock ? 'low_stock' : 'in_stock'),
     ]);
 
     const csv = generateCsv(headers, rows);
@@ -145,7 +174,10 @@ export class InventoryController {
     @Session() session: UserSession,
   ) {
     const daysAhead = days ? parseInt(days, 10) : 7;
-    const items = await this.inventoryService.getExpiringItems(businessId, daysAhead);
+    const items = await this.inventoryService.getExpiringItems(
+      businessId,
+      daysAhead,
+    );
     return { items };
   }
 
@@ -174,7 +206,11 @@ export class InventoryController {
   }
 
   @Patch(':id')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -182,10 +218,16 @@ export class InventoryController {
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const item = await this.inventoryService.update(businessId, id, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const item = await this.inventoryService.update(
+      businessId,
+      id,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
 
     return {
       message: 'Inventory item updated successfully',
@@ -208,7 +250,12 @@ export class InventoryController {
   }
 
   @Post(':id/transaction')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async processTransaction(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

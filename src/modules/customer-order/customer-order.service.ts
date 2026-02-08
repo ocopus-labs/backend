@@ -50,9 +50,13 @@ export class CustomerOrderService {
     // Validate size price
     if (submitted.size && actual.sizes) {
       const actualSize = actual.sizes.find(
-        (s: any) => s.id === submitted.size.id || s.name === submitted.size.name,
+        (s: any) =>
+          s.id === submitted.size.id || s.name === submitted.size.name,
       );
-      if (actualSize && Math.abs(actualSize.price - submitted.size.price) > 0.01) {
+      if (
+        actualSize &&
+        Math.abs(actualSize.price - submitted.size.price) > 0.01
+      ) {
         throw new BadRequestException(
           `Size price for "${itemName}" has changed. Please refresh.`,
         );
@@ -61,9 +65,14 @@ export class CustomerOrderService {
     // Validate spice level price
     if (submitted.spiceLevel && actual.spiceLevels) {
       const actualSpice = actual.spiceLevels.find(
-        (s: any) => s.id === submitted.spiceLevel.id || s.name === submitted.spiceLevel.name,
+        (s: any) =>
+          s.id === submitted.spiceLevel.id ||
+          s.name === submitted.spiceLevel.name,
       );
-      if (actualSpice && Math.abs(actualSpice.price - submitted.spiceLevel.price) > 0.01) {
+      if (
+        actualSpice &&
+        Math.abs(actualSpice.price - submitted.spiceLevel.price) > 0.01
+      ) {
         throw new BadRequestException(
           `Spice level price for "${itemName}" has changed. Please refresh.`,
         );
@@ -73,9 +82,13 @@ export class CustomerOrderService {
     if (submitted.addOns && actual.addOns) {
       for (const submittedAddOn of submitted.addOns) {
         const actualAddOn = actual.addOns.find(
-          (a: any) => a.id === submittedAddOn.id || a.name === submittedAddOn.name,
+          (a: any) =>
+            a.id === submittedAddOn.id || a.name === submittedAddOn.name,
         );
-        if (actualAddOn && Math.abs(actualAddOn.price - submittedAddOn.price) > 0.01) {
+        if (
+          actualAddOn &&
+          Math.abs(actualAddOn.price - submittedAddOn.price) > 0.01
+        ) {
           throw new BadRequestException(
             `Add-on "${submittedAddOn.name}" price for "${itemName}" has changed. Please refresh.`,
           );
@@ -84,7 +97,11 @@ export class CustomerOrderService {
     }
   }
 
-  private calculateItemTotal(item: { basePrice: number; quantity: number; modifiers?: any }): number {
+  private calculateItemTotal(item: {
+    basePrice: number;
+    quantity: number;
+    modifiers?: any;
+  }): number {
     let total = item.basePrice * item.quantity;
 
     if (item.modifiers) {
@@ -110,10 +127,13 @@ export class CustomerOrderService {
     taxBreakdown?: TaxBreakdown,
   ): OrderPricing {
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const taxAmount = taxBreakdown ? taxBreakdown.totalTax : (subtotal * taxRate) / 100;
-    const effectiveRate = taxBreakdown && subtotal > 0
-      ? Math.round((taxAmount / subtotal) * 10000) / 100
-      : taxRate;
+    const taxAmount = taxBreakdown
+      ? taxBreakdown.totalTax
+      : (subtotal * taxRate) / 100;
+    const effectiveRate =
+      taxBreakdown && subtotal > 0
+        ? Math.round((taxAmount / subtotal) * 10000) / 100
+        : taxRate;
 
     const total = subtotal + taxAmount;
 
@@ -219,7 +239,9 @@ export class CustomerOrderService {
     };
 
     if (!ordering.selfOrderEnabled) {
-      throw new BadRequestException('Self-ordering is not enabled for this business');
+      throw new BadRequestException(
+        'Self-ordering is not enabled for this business',
+      );
     }
 
     // Extract only the currency from settings for public display
@@ -261,7 +283,9 @@ export class CustomerOrderService {
     };
 
     if (!ordering.selfOrderEnabled) {
-      throw new BadRequestException('Self-ordering is not enabled for this business');
+      throw new BadRequestException(
+        'Self-ordering is not enabled for this business',
+      );
     }
 
     const menuData = await this.prisma.menuItem.findFirst({
@@ -275,9 +299,14 @@ export class CustomerOrderService {
 
     // menuData.categories is { categories: MenuCategory[], items: MenuItem[] }
     // Items are flat with categoryId, NOT nested inside categories
-    const data = menuData.categories as unknown as { categories: any[]; items: any[] };
+    const data = menuData.categories as unknown as {
+      categories: any[];
+      items: any[];
+    };
     const cats = data?.categories || [];
-    const items = (data?.items || []).filter((item: any) => item.isAvailable !== false);
+    const items = (data?.items || []).filter(
+      (item: any) => item.isAvailable !== false,
+    );
 
     const categories = cats
       .filter((cat: any) => cat.isActive !== false)
@@ -337,7 +366,9 @@ export class CustomerOrderService {
     };
 
     if (!ordering.selfOrderEnabled) {
-      throw new BadRequestException('Self-ordering is not enabled for this business');
+      throw new BadRequestException(
+        'Self-ordering is not enabled for this business',
+      );
     }
 
     // Per-phone spam protection
@@ -358,9 +389,13 @@ export class CustomerOrderService {
     }
 
     // Check subscription order limit
-    const limitCheck = await this.usageTrackingService.checkOrderLimit(restaurant.id);
+    const limitCheck = await this.usageTrackingService.checkOrderLimit(
+      restaurant.id,
+    );
     if (!limitCheck.allowed) {
-      throw new BadRequestException('This business has reached its order limit. Please try again later.');
+      throw new BadRequestException(
+        'This business has reached its order limit. Please try again later.',
+      );
     }
 
     // ── Server-side price validation ──
@@ -405,7 +440,11 @@ export class CustomerOrderService {
       }
       // Validate modifier prices if present
       if (dtoItem.modifiers && menuItem.modifiers) {
-        this.validateModifierPrices(dtoItem.modifiers, menuItem.modifiers, menuItem.name);
+        this.validateModifierPrices(
+          dtoItem.modifiers,
+          menuItem.modifiers,
+          menuItem.name,
+        );
       }
     }
 
@@ -680,11 +719,7 @@ export class CustomerOrderService {
     return { payment, message: 'Payment recorded' };
   }
 
-  async generatePublicPaymentQr(
-    slug: string,
-    amount: number,
-    note?: string,
-  ) {
+  async generatePublicPaymentQr(slug: string, amount: number, note?: string) {
     const restaurant = await this.prisma.restaurant.findUnique({
       where: { slug },
       select: { id: true },
@@ -701,10 +736,7 @@ export class CustomerOrderService {
    * Create a Dodo Payments checkout session for an order.
    * Returns { checkoutUrl, sessionId } or null if Dodo not configured.
    */
-  async createDodoPaymentSession(
-    trackingToken: string,
-    returnUrl: string,
-  ) {
+  async createDodoPaymentSession(trackingToken: string, returnUrl: string) {
     if (!this.dodoService.isOrderPaymentConfigured()) {
       return null;
     }
@@ -751,8 +783,13 @@ export class CustomerOrderService {
 
       return result;
     } catch (error) {
-      this.logger.error(`Dodo checkout creation failed: ${error.message}`, error.stack);
-      throw new BadRequestException('Payment checkout unavailable. Please try again.');
+      this.logger.error(
+        `Dodo checkout creation failed: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        'Payment checkout unavailable. Please try again.',
+      );
     }
   }
 
@@ -762,5 +799,4 @@ export class CustomerOrderService {
   isDodoPaymentAvailable(): boolean {
     return this.dodoService.isOrderPaymentConfigured();
   }
-
 }

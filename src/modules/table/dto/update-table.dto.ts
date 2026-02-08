@@ -10,7 +10,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TABLE_SHAPES, TableShape, TableStatus, TABLE_STATUSES } from '../interfaces';
+import {
+  TABLE_SHAPES,
+  TableShape,
+  TableStatus,
+  TABLE_STATUSES,
+} from '../interfaces';
 
 class PositionDto {
   @IsInt()

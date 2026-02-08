@@ -11,9 +11,13 @@ export function registerAnalyticsTools(server: McpServer, ctx: McpContext) {
       "Get today's dashboard statistics (revenue, orders, AOV, comparisons)",
       {},
       async () => {
-        const result = await ctx.analyticsService.getDashboardStats(ctx.businessId);
+        const result = await ctx.analyticsService.getDashboardStats(
+          ctx.businessId,
+        );
         await ctx.audit('analytics.dashboard', 'analytics', null);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -30,8 +34,13 @@ export function registerAnalyticsTools(server: McpServer, ctx: McpContext) {
           new Date(startDate),
           new Date(endDate),
         );
-        await ctx.audit('analytics.sales_summary', 'analytics', null, { startDate, endDate });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        await ctx.audit('analytics.sales_summary', 'analytics', null, {
+          startDate,
+          endDate,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -39,13 +48,32 @@ export function registerAnalyticsTools(server: McpServer, ctx: McpContext) {
       'get-top-selling-items',
       'Get top selling menu items over a period',
       {
-        limit: z.number().min(1).max(50).default(10).describe('Number of items to return'),
-        days: z.number().min(1).max(365).default(7).describe('Number of days to look back'),
+        limit: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe('Number of items to return'),
+        days: z
+          .number()
+          .min(1)
+          .max(365)
+          .default(7)
+          .describe('Number of days to look back'),
       },
       async ({ limit, days }) => {
-        const result = await ctx.orderService.getTopSellingItems(ctx.businessId, limit, days);
-        await ctx.audit('analytics.top_items', 'analytics', null, { limit, days });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        const result = await ctx.orderService.getTopSellingItems(
+          ctx.businessId,
+          limit,
+          days,
+        );
+        await ctx.audit('analytics.top_items', 'analytics', null, {
+          limit,
+          days,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -53,12 +81,22 @@ export function registerAnalyticsTools(server: McpServer, ctx: McpContext) {
       'get-peak-hours',
       'Get peak hours analysis showing order volume and revenue by hour',
       {
-        days: z.number().min(1).max(365).default(7).describe('Number of days to analyze'),
+        days: z
+          .number()
+          .min(1)
+          .max(365)
+          .default(7)
+          .describe('Number of days to analyze'),
       },
       async ({ days }) => {
-        const result = await ctx.orderService.getPeakHours(ctx.businessId, days);
+        const result = await ctx.orderService.getPeakHours(
+          ctx.businessId,
+          days,
+        );
         await ctx.audit('analytics.peak_hours', 'analytics', null, { days });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -69,9 +107,16 @@ export function registerAnalyticsTools(server: McpServer, ctx: McpContext) {
         days: z.number().min(1).max(365).default(30).describe('Number of days'),
       },
       async ({ days }) => {
-        const result = await ctx.orderService.getRevenueTrends(ctx.businessId, days);
-        await ctx.audit('analytics.revenue_trends', 'analytics', null, { days });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        const result = await ctx.orderService.getRevenueTrends(
+          ctx.businessId,
+          days,
+        );
+        await ctx.audit('analytics.revenue_trends', 'analytics', null, {
+          days,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -88,8 +133,13 @@ export function registerAnalyticsTools(server: McpServer, ctx: McpContext) {
           new Date(startDate),
           new Date(endDate),
         );
-        await ctx.audit('analytics.payment_breakdown', 'analytics', null, { startDate, endDate });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        await ctx.audit('analytics.payment_breakdown', 'analytics', null, {
+          startDate,
+          endDate,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
   }

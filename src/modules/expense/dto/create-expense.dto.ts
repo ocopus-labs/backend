@@ -12,7 +12,12 @@ import {
   IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PAYMENT_METHODS, RECURRING_FREQUENCIES, PaymentMethod, RecurringFrequency } from '../interfaces';
+import {
+  PAYMENT_METHODS,
+  RECURRING_FREQUENCIES,
+  PaymentMethod,
+  RecurringFrequency,
+} from '../interfaces';
 
 export class CreateExpenseDto {
   @IsString()

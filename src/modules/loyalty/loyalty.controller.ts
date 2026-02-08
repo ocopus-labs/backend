@@ -11,7 +11,11 @@ import {
 } from '@nestjs/common';
 import { Session } from '@thallesp/nestjs-better-auth';
 import { LoyaltyService } from './loyalty.service';
-import { UpdateLoyaltySettingsDto, RedeemPointsDto, AdjustPointsDto } from './dto';
+import {
+  UpdateLoyaltySettingsDto,
+  RedeemPointsDto,
+  AdjustPointsDto,
+} from './dto';
 import { BusinessRoles } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 
@@ -108,11 +112,7 @@ export class LoyaltyController {
     @Param('customerId') customerId: string,
     @Body() dto: RedeemPointsDto,
   ) {
-    return this.loyaltyService.redeemPoints(
-      businessId,
-      customerId,
-      dto.points,
-    );
+    return this.loyaltyService.redeemPoints(businessId, customerId, dto.points);
   }
 
   @Post('customers/:customerId/adjust')

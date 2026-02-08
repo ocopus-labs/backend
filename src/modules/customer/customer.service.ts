@@ -23,11 +23,15 @@ export class CustomerService {
   ) {
     // Check phone uniqueness within this business
     const existing = await this.prisma.customer.findUnique({
-      where: { restaurantId_phone: { restaurantId: businessId, phone: dto.phone } },
+      where: {
+        restaurantId_phone: { restaurantId: businessId, phone: dto.phone },
+      },
     });
 
     if (existing) {
-      throw new ConflictException('A customer with this phone number already exists');
+      throw new ConflictException(
+        'A customer with this phone number already exists',
+      );
     }
 
     const customer = await this.prisma.$transaction(async (tx) => {
@@ -184,10 +188,14 @@ export class CustomerService {
     // Check phone uniqueness if phone is being changed
     if (dto.phone && dto.phone !== existing.phone) {
       const duplicate = await this.prisma.customer.findUnique({
-        where: { restaurantId_phone: { restaurantId: businessId, phone: dto.phone } },
+        where: {
+          restaurantId_phone: { restaurantId: businessId, phone: dto.phone },
+        },
       });
       if (duplicate) {
-        throw new ConflictException('A customer with this phone number already exists');
+        throw new ConflictException(
+          'A customer with this phone number already exists',
+        );
       }
     }
 
@@ -277,8 +285,12 @@ export class CustomerService {
 
     const [total, active, inactive, newThisMonth] = await Promise.all([
       this.prisma.customer.count({ where: { restaurantId: businessId } }),
-      this.prisma.customer.count({ where: { restaurantId: businessId, status: 'active' } }),
-      this.prisma.customer.count({ where: { restaurantId: businessId, status: 'inactive' } }),
+      this.prisma.customer.count({
+        where: { restaurantId: businessId, status: 'active' },
+      }),
+      this.prisma.customer.count({
+        where: { restaurantId: businessId, status: 'inactive' },
+      }),
       this.prisma.customer.count({
         where: { restaurantId: businessId, createdAt: { gte: startOfMonth } },
       }),

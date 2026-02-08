@@ -33,7 +33,7 @@ interface UserSession {
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService) {}
 
   /**
    * Get current user profile
@@ -55,7 +55,9 @@ export class AuthController {
   @Get('me/preferences')
   async getPreferences(@Session() session: UserSession) {
     try {
-      const preferences = await this.authService.getUserPreferences(session.user.id);
+      const preferences = await this.authService.getUserPreferences(
+        session.user.id,
+      );
       return { preferences };
     } catch (error) {
       this.logger.error('Error getting preferences:', error);
@@ -87,7 +89,11 @@ export class AuthController {
    * List all users (admin only)
    */
   @Get('users')
-  @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER])
+  @Roles([
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+  ])
   async listUsers(
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 50,
     @Query('offset', new ParseIntPipe({ optional: true })) offset: number = 0,
@@ -105,7 +111,11 @@ export class AuthController {
    * Get user by ID (admin only)
    */
   @Get('users/:userId')
-  @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER])
+  @Roles([
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+  ])
   async getUser(@Param('userId') userId: string) {
     try {
       const user = await this.authService.getUserById(userId);
@@ -124,7 +134,11 @@ export class AuthController {
    */
   @Post('users/:userId/role')
   @HttpCode(HttpStatus.OK)
-  @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER])
+  @Roles([
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+  ])
   async updateUserRole(
     @Param('userId') userId: string,
     @Body() body: UpdateRoleDto,
@@ -194,10 +208,7 @@ export class AuthController {
   @Post('users/:userId/ban')
   @HttpCode(HttpStatus.OK)
   @Roles([USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER])
-  async banUser(
-    @Param('userId') userId: string,
-    @Body() body: BanUserDto,
-  ) {
+  async banUser(@Param('userId') userId: string, @Body() body: BanUserDto) {
     try {
       await this.authService.banUser(userId, body.reason, body.expiresIn);
       return { message: 'User banned successfully' };

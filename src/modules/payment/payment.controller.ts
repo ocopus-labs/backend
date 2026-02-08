@@ -40,8 +40,17 @@ export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post()
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
-  @Throttle({ short: { ttl: 2000, limit: 1 }, medium: { ttl: 10000, limit: 5 } })
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
+  @Throttle({
+    short: { ttl: 2000, limit: 1 },
+    medium: { ttl: 10000, limit: 5 },
+  })
   async createPayment(
     @Param('businessId') businessId: string,
     @Body() dto: CreatePaymentDto,
@@ -55,18 +64,32 @@ export class PaymentController {
   }
 
   @Post('split')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
-  @Throttle({ short: { ttl: 2000, limit: 1 }, medium: { ttl: 10000, limit: 5 } })
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
+  @Throttle({
+    short: { ttl: 2000, limit: 1 },
+    medium: { ttl: 10000, limit: 5 },
+  })
   async createSplitPayment(
     @Param('businessId') businessId: string,
     @Body() dto: CreateSplitPaymentDto,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    return this.paymentService.createSplitPayment(businessId, session.user.id, dto, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.paymentService.createSplitPayment(
+      businessId,
+      session.user.id,
+      dto,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
   }
 
   @Get()
@@ -91,7 +114,12 @@ export class PaymentController {
   }
 
   @Get('export')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async exportPayments(
     @Param('businessId') businessId: string,
     @Query('status') status?: string,
@@ -109,7 +137,15 @@ export class PaymentController {
       offset: 0,
     });
 
-    const headers = ['Payment #', 'Order #', 'Date', 'Customer', 'Method', 'Amount', 'Status'];
+    const headers = [
+      'Payment #',
+      'Order #',
+      'Date',
+      'Customer',
+      'Method',
+      'Amount',
+      'Status',
+    ];
     const rows = payments.map((p: any) => [
       p.paymentNumber || '',
       p.orderNumber || '',
@@ -169,8 +205,16 @@ export class PaymentController {
 
   @Post(':paymentId/refund')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
-  @Throttle({ short: { ttl: 2000, limit: 1 }, medium: { ttl: 10000, limit: 3 } })
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
+  @Throttle({
+    short: { ttl: 2000, limit: 1 },
+    medium: { ttl: 10000, limit: 3 },
+  })
   async processRefund(
     @Param('businessId') businessId: string,
     @Param('paymentId') paymentId: string,
@@ -178,10 +222,16 @@ export class PaymentController {
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    return this.paymentService.processRefund(businessId, paymentId, session.user.id, dto, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.paymentService.processRefund(
+      businessId,
+      paymentId,
+      session.user.id,
+      dto,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
   }
 
   @Get(':paymentId/refunds')
@@ -200,16 +250,26 @@ export class PaymentController {
 
   @Delete(':paymentId')
   @HttpCode(HttpStatus.OK)
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async softDeletePayment(
     @Param('businessId') businessId: string,
     @Param('paymentId') paymentId: string,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    return this.paymentService.softDelete(businessId, paymentId, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    return this.paymentService.softDelete(
+      businessId,
+      paymentId,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
   }
 }

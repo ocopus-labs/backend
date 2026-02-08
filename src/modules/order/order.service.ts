@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -72,10 +78,13 @@ export class OrderService {
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
 
     // Use tax breakdown total if available, otherwise fall back to flat rate
-    const taxAmount = taxBreakdown ? taxBreakdown.totalTax : (subtotal * taxRate) / 100;
-    const effectiveRate = taxBreakdown && subtotal > 0
-      ? Math.round((taxAmount / subtotal) * 10000) / 100
-      : taxRate;
+    const taxAmount = taxBreakdown
+      ? taxBreakdown.totalTax
+      : (subtotal * taxRate) / 100;
+    const effectiveRate =
+      taxBreakdown && subtotal > 0
+        ? Math.round((taxAmount / subtotal) * 10000) / 100
+        : taxRate;
 
     let discountAmount = 0;
     if (discount) {
@@ -108,7 +117,8 @@ export class OrderService {
     context?: { ipAddress?: string; userAgent?: string },
   ) {
     // Check subscription order limit
-    const limitCheck = await this.usageTrackingService.checkOrderLimit(businessId);
+    const limitCheck =
+      await this.usageTrackingService.checkOrderLimit(businessId);
     if (!limitCheck.allowed) {
       throw new ForbiddenException(
         limitCheck.message ||
@@ -142,11 +152,15 @@ export class OrderService {
           select: { categories: true },
         });
         const allMenuItems = menuData
-          ? ((menuData.categories as any[]) || []).flatMap((cat: any) => cat.items || [])
+          ? ((menuData.categories as any[]) || []).flatMap(
+              (cat: any) => cat.items || [],
+            )
           : [];
 
         const taxableItems = orderItems.map((item) => {
-          const menuItem = allMenuItems.find((mi: any) => mi.id === item.menuItemId);
+          const menuItem = allMenuItems.find(
+            (mi: any) => mi.id === item.menuItemId,
+          );
           return {
             id: item.id,
             name: item.name,
@@ -203,7 +217,9 @@ export class OrderService {
     // Calculate estimated completion time
     let estimatedCompletionTime: Date | null = null;
     if (dto.estimatedMinutes) {
-      estimatedCompletionTime = new Date(Date.now() + dto.estimatedMinutes * 60000);
+      estimatedCompletionTime = new Date(
+        Date.now() + dto.estimatedMinutes * 60000,
+      );
     }
 
     const order = await this.prisma.$transaction(async (tx) => {
@@ -277,7 +293,10 @@ export class OrderService {
       offset?: number;
     },
   ) {
-    const where: Record<string, unknown> = { restaurantId: businessId, deletedAt: null };
+    const where: Record<string, unknown> = {
+      restaurantId: businessId,
+      deletedAt: null,
+    };
 
     if (options?.status) {
       where.status = options.status;
@@ -431,7 +450,8 @@ export class OrderService {
         status: dto.status,
         timestamps: timestamps as unknown as object,
         auditTrail: auditTrail as unknown as object[],
-        actualCompletionTime: dto.status === 'completed' ? new Date() : undefined,
+        actualCompletionTime:
+          dto.status === 'completed' ? new Date() : undefined,
       },
       include: {
         table: true,
@@ -446,18 +466,32 @@ export class OrderService {
         action: `order.${dto.status}`,
         resource: 'order',
         resourceId: order.id,
-        details: { orderNumber: order.orderNumber, reason: dto.reason } as object,
+        details: {
+          orderNumber: order.orderNumber,
+          reason: dto.reason,
+        } as object,
       },
     });
 
     // Auto-end table session when order is completed or cancelled
-    if ((dto.status === 'completed' || dto.status === 'cancelled') && existing.tableId) {
+    if (
+      (dto.status === 'completed' || dto.status === 'cancelled') &&
+      existing.tableId
+    ) {
       try {
-        await this.tableService.endSession(businessId, existing.tableId, staffId);
-        this.logger.log(`Table session ended for table ${existing.tableId} (order ${dto.status})`);
+        await this.tableService.endSession(
+          businessId,
+          existing.tableId,
+          staffId,
+        );
+        this.logger.log(
+          `Table session ended for table ${existing.tableId} (order ${dto.status})`,
+        );
       } catch (err) {
         // Don't fail the order update if table session end fails
-        this.logger.warn(`Failed to end table session for table ${existing.tableId}: ${err}`);
+        this.logger.warn(
+          `Failed to end table session for table ${existing.tableId}: ${err}`,
+        );
       }
     }
 
@@ -526,7 +560,10 @@ export class OrderService {
       allItems,
       existingPricing.taxRate,
       existingPricing.discountType
-        ? { type: existingPricing.discountType, value: existingPricing.discountValue! }
+        ? {
+            type: existingPricing.discountType,
+            value: existingPricing.discountValue,
+          }
         : undefined,
       existingPricing.serviceCharge,
     );
@@ -536,7 +573,10 @@ export class OrderService {
       action: 'order.items_added',
       performedBy: staffId,
       performedAt: now,
-      details: { itemsAdded: newItems.length, newItemNames: newItems.map((i) => i.name) },
+      details: {
+        itemsAdded: newItems.length,
+        newItemNames: newItems.map((i) => i.name),
+      },
     });
 
     const order = await this.prisma.order.update({
@@ -544,7 +584,9 @@ export class OrderService {
       data: {
         items: allItems as unknown as object[],
         pricing: pricing as unknown as object,
-        balanceDue: pricing.total - (Number(existingPricing.total) - Number(existing.balanceDue)),
+        balanceDue:
+          pricing.total -
+          (Number(existingPricing.total) - Number(existing.balanceDue)),
         auditTrail: auditTrail as unknown as object[],
       },
       include: {
@@ -595,7 +637,10 @@ export class OrderService {
       items,
       existingPricing.taxRate,
       existingPricing.discountType
-        ? { type: existingPricing.discountType, value: existingPricing.discountValue! }
+        ? {
+            type: existingPricing.discountType,
+            value: existingPricing.discountValue,
+          }
         : undefined,
       existingPricing.serviceCharge,
     );
@@ -718,7 +763,9 @@ export class OrderService {
     const filteredItems = items.filter((i) => i.id !== itemId);
 
     if (filteredItems.length === 0) {
-      throw new BadRequestException('Cannot remove the last item. Cancel the order instead.');
+      throw new BadRequestException(
+        'Cannot remove the last item. Cancel the order instead.',
+      );
     }
 
     // Recalculate pricing
@@ -727,7 +774,10 @@ export class OrderService {
       filteredItems,
       existingPricing.taxRate,
       existingPricing.discountType
-        ? { type: existingPricing.discountType, value: existingPricing.discountValue! }
+        ? {
+            type: existingPricing.discountType,
+            value: existingPricing.discountValue,
+          }
         : undefined,
       existingPricing.serviceCharge,
     );
@@ -777,7 +827,8 @@ export class OrderService {
     const now = new Date().toISOString();
     const items = existing.items as unknown as OrderItem[];
     const existingPricing = existing.pricing as unknown as OrderPricing;
-    const discountsApplied = existing.discountsApplied as unknown as OrderDiscount[];
+    const discountsApplied =
+      existing.discountsApplied as unknown as OrderDiscount[];
     const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
 
     // Calculate new pricing with discount
@@ -803,7 +854,11 @@ export class OrderService {
       action: 'order.discount_applied',
       performedBy: staffId,
       performedAt: now,
-      details: { type: dto.type, value: dto.value, amount: pricing.discountAmount },
+      details: {
+        type: dto.type,
+        value: dto.value,
+        amount: pricing.discountAmount,
+      },
     });
 
     const order = await this.prisma.order.update({
@@ -895,12 +950,17 @@ export class OrderService {
         completedOrders,
         cancelledOrders,
         totalRevenue,
-        averageOrderValue: completedOrders > 0 ? totalRevenue / completedOrders : 0,
+        averageOrderValue:
+          completedOrders > 0 ? totalRevenue / completedOrders : 0,
       },
     };
   }
 
-  async getTopSellingItems(businessId: string, limit: number = 5, days: number = 7) {
+  async getTopSellingItems(
+    businessId: string,
+    limit: number = 5,
+    days: number = 7,
+  ) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
@@ -970,7 +1030,10 @@ export class OrderService {
     });
 
     // Aggregate by hour
-    const hourlyStats = new Map<number, { orderCount: number; revenue: number }>();
+    const hourlyStats = new Map<
+      number,
+      { orderCount: number; revenue: number }
+    >();
 
     for (const order of orders) {
       const hour = order.createdAt.getHours();
@@ -1061,7 +1124,9 @@ export class OrderService {
     }
 
     if (existing.status === 'active') {
-      throw new BadRequestException('Cannot delete an active order. Cancel it first.');
+      throw new BadRequestException(
+        'Cannot delete an active order. Cancel it first.',
+      );
     }
 
     const order = await this.prisma.$transaction(async (tx) => {

@@ -142,7 +142,9 @@ export class MailService implements OnModuleInit {
     this.ensureConfigured();
 
     try {
-      const results = await Promise.all(emails.map((email) => this.send(email)));
+      const results = await Promise.all(
+        emails.map((email) => this.send(email)),
+      );
       return results;
     } catch (error) {
       this.logger.error(
@@ -163,7 +165,10 @@ export class MailService implements OnModuleInit {
     email: string,
     data: Omit<WelcomeEmailData, 'email'>,
   ): Promise<SendEmailResponse> {
-    const template = welcomeEmailTemplate({ ...data, email }, this.templateConfig);
+    const template = welcomeEmailTemplate(
+      { ...data, email },
+      this.templateConfig,
+    );
     return this.send({
       to: email,
       subject: template.subject,

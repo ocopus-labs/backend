@@ -22,7 +22,8 @@ export const RESTAURANT_SUBTYPES = {
   CLOUD_KITCHEN: 'cloud-kitchen',
 } as const;
 
-export type RestaurantSubtype = (typeof RESTAURANT_SUBTYPES)[keyof typeof RESTAURANT_SUBTYPES];
+export type RestaurantSubtype =
+  (typeof RESTAURANT_SUBTYPES)[keyof typeof RESTAURANT_SUBTYPES];
 
 export const BUSINESS_TYPE_CONFIG = {
   [BUSINESS_TYPES.RESTAURANT]: {

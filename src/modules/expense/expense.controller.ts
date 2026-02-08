@@ -51,7 +51,11 @@ export class ExpenseController {
   // ============ CATEGORY ENDPOINTS ============
 
   @Post('categories')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async createCategory(
     @Param('businessId') businessId: string,
     @Body() dto: CreateExpenseCategoryDto,
@@ -91,12 +95,19 @@ export class ExpenseController {
     @Param('id') id: string,
     @Session() session: UserSession,
   ) {
-    const category = await this.expenseService.findCategoryByIdOrFail(businessId, id);
+    const category = await this.expenseService.findCategoryByIdOrFail(
+      businessId,
+      id,
+    );
     return { category };
   }
 
   @Patch('categories/:id')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async updateCategory(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -140,17 +151,27 @@ export class ExpenseController {
   // ============ EXPENSE ENDPOINTS ============
 
   @Post()
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER, USER_ROLES.STAFF)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
   async create(
     @Param('businessId') businessId: string,
     @Body() dto: CreateExpenseDto,
     @Session() session: UserSession,
     @Req() req: any,
   ) {
-    const expense = await this.expenseService.create(businessId, dto, session.user.id, {
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+    const expense = await this.expenseService.create(
+      businessId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
 
     return {
       message: 'Expense created successfully',
@@ -182,7 +203,12 @@ export class ExpenseController {
   }
 
   @Get('export')
-  @BusinessRoles(USER_ROLES.SUPER_ADMIN, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async exportExpenses(
     @Param('businessId') businessId: string,
     @Query('categoryId') categoryId?: string,
@@ -201,7 +227,16 @@ export class ExpenseController {
     });
 
     const expenses = result.expenses || [];
-    const headers = ['Date', 'Title', 'Category', 'Vendor', 'Amount', 'Tax', 'Payment Method', 'Status'];
+    const headers = [
+      'Date',
+      'Title',
+      'Category',
+      'Vendor',
+      'Amount',
+      'Tax',
+      'Payment Method',
+      'Status',
+    ];
     const rows = expenses.map((e: any) => [
       e.expenseDate ? new Date(e.expenseDate).toISOString().split('T')[0] : '',
       e.title || '',
@@ -238,7 +273,11 @@ export class ExpenseController {
   }
 
   @Get('pending')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async getPending(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -261,7 +300,11 @@ export class ExpenseController {
   }
 
   @Patch(':id')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -284,7 +327,11 @@ export class ExpenseController {
   }
 
   @Post(':id/approve')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async approve(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -307,7 +354,11 @@ export class ExpenseController {
   }
 
   @Post(':id/reject')
-  @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.FRANCHISE_OWNER, USER_ROLES.MANAGER)
+  @BusinessRoles(
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.MANAGER,
+  )
   async reject(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

@@ -38,7 +38,9 @@ export function baseTemplate(
   const cfg = { ...defaultConfig, ...config };
   const preheader = options.preheader || '';
   const currentYear = new Date().getFullYear();
-  const footerText = options.footerText || `© ${currentYear} ${cfg.appName}. All rights reserved.`;
+  const footerText =
+    options.footerText ||
+    `© ${currentYear} ${cfg.appName}. All rights reserved.`;
 
   return `
 <!DOCTYPE html>

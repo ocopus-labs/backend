@@ -39,21 +39,31 @@ export class CustomerOrderController {
 
   @Get('public/order/:slug')
   @AllowAnonymous()
-  @Throttle({ short: { ttl: 2000, limit: 5 }, medium: { ttl: 60000, limit: 30 } })
+  @Throttle({
+    short: { ttl: 2000, limit: 5 },
+    medium: { ttl: 60000, limit: 30 },
+  })
   async getPublicBusinessInfo(@Param('slug') slug: string) {
     return this.customerOrderService.getPublicBusinessInfo(slug);
   }
 
   @Get('public/order/:slug/menu')
   @AllowAnonymous()
-  @Throttle({ short: { ttl: 2000, limit: 5 }, medium: { ttl: 60000, limit: 30 } })
+  @Throttle({
+    short: { ttl: 2000, limit: 5 },
+    medium: { ttl: 60000, limit: 30 },
+  })
   async getPublicMenu(@Param('slug') slug: string) {
     return this.customerOrderService.getPublicMenu(slug);
   }
 
   @Post('public/order/:slug/place')
   @AllowAnonymous()
-  @Throttle({ short: { ttl: 5000, limit: 1 }, medium: { ttl: 60000, limit: 5 }, long: { ttl: 3600000, limit: 20 } })
+  @Throttle({
+    short: { ttl: 5000, limit: 1 },
+    medium: { ttl: 60000, limit: 5 },
+    long: { ttl: 3600000, limit: 20 },
+  })
   async placeCustomerOrder(
     @Param('slug') slug: string,
     @Body() dto: CustomerPlaceOrderDto,
@@ -63,14 +73,20 @@ export class CustomerOrderController {
 
   @Get('public/order/track/:trackingToken')
   @AllowAnonymous()
-  @Throttle({ short: { ttl: 2000, limit: 3 }, medium: { ttl: 60000, limit: 60 } })
+  @Throttle({
+    short: { ttl: 2000, limit: 3 },
+    medium: { ttl: 60000, limit: 60 },
+  })
   async getOrderTracking(@Param('trackingToken') trackingToken: string) {
     return this.customerOrderService.getOrderByToken(trackingToken);
   }
 
   @Post('public/order/track/:trackingToken/payment')
   @AllowAnonymous()
-  @Throttle({ short: { ttl: 5000, limit: 1 }, medium: { ttl: 60000, limit: 5 } })
+  @Throttle({
+    short: { ttl: 5000, limit: 1 },
+    medium: { ttl: 60000, limit: 5 },
+  })
   async createCustomerPayment(
     @Param('trackingToken') trackingToken: string,
     @Body() dto: CustomerPaymentDto,
@@ -80,7 +96,10 @@ export class CustomerOrderController {
 
   @Post('public/order/:slug/payment-qr')
   @AllowAnonymous()
-  @Throttle({ short: { ttl: 3000, limit: 2 }, medium: { ttl: 60000, limit: 10 } })
+  @Throttle({
+    short: { ttl: 3000, limit: 2 },
+    medium: { ttl: 60000, limit: 10 },
+  })
   async generatePaymentQr(
     @Param('slug') slug: string,
     @Body() dto: GenerateCustomerPaymentQrDto,
@@ -94,7 +113,10 @@ export class CustomerOrderController {
 
   @Post('public/order/pay/:trackingToken/checkout')
   @AllowAnonymous()
-  @Throttle({ short: { ttl: 5000, limit: 2 }, medium: { ttl: 60000, limit: 10 } })
+  @Throttle({
+    short: { ttl: 5000, limit: 2 },
+    medium: { ttl: 60000, limit: 10 },
+  })
   async createPaymentCheckout(
     @Param('trackingToken') trackingToken: string,
     @Body() dto: CreatePaymentCheckoutDto,

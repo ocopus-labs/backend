@@ -7,7 +7,12 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { CloudinaryService } from 'src/lib/common/upload/cloudinary.service';
-import { CreateMenuItemDto, UpdateMenuItemDto, CreateCategoryDto, UpdateCategoryDto } from './dto';
+import {
+  CreateMenuItemDto,
+  UpdateMenuItemDto,
+  CreateCategoryDto,
+  UpdateCategoryDto,
+} from './dto';
 import { MenuItem, MenuCategory, MenuData, MenuResponse } from './interfaces';
 
 @Injectable()
@@ -100,7 +105,10 @@ export class MenuService {
   /**
    * Save menu data
    */
-  private async saveMenuData(menuId: string, menuData: MenuData): Promise<void> {
+  private async saveMenuData(
+    menuId: string,
+    menuData: MenuData,
+  ): Promise<void> {
     await this.prisma.menuItem.update({
       where: { id: menuId },
       data: {
@@ -122,7 +130,10 @@ export class MenuService {
   /**
    * Get category by ID
    */
-  async getCategoryById(businessId: string, categoryId: string): Promise<MenuCategory> {
+  async getCategoryById(
+    businessId: string,
+    categoryId: string,
+  ): Promise<MenuCategory> {
     const menu = await this.getMenu(businessId);
     const category = menu.categories.find((c) => c.id === categoryId);
 
@@ -136,7 +147,12 @@ export class MenuService {
   /**
    * Create a new category
    */
-  async createCategory(businessId: string, dto: CreateCategoryDto, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<MenuCategory> {
+  async createCategory(
+    businessId: string,
+    dto: CreateCategoryDto,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<MenuCategory> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
@@ -160,9 +176,18 @@ export class MenuService {
     categories.push(newCategory);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'CREATE', 'menu_category', { categoryId: newCategory.id, name: newCategory.name }, context);
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'CREATE',
+      'menu_category',
+      { categoryId: newCategory.id, name: newCategory.name },
+      context,
+    );
 
-    this.logger.log(`Category created: ${newCategory.name} (${newCategory.id}) for business ${businessId}`);
+    this.logger.log(
+      `Category created: ${newCategory.name} (${newCategory.id}) for business ${businessId}`,
+    );
     return newCategory;
   }
 
@@ -187,7 +212,10 @@ export class MenuService {
     }
 
     // Process image (upload to Cloudinary if base64)
-    const imageUrl = dto.image !== undefined ? await this.processImage(dto.image) : categories[categoryIndex].image;
+    const imageUrl =
+      dto.image !== undefined
+        ? await this.processImage(dto.image)
+        : categories[categoryIndex].image;
 
     const updatedCategory: MenuCategory = {
       ...categories[categoryIndex],
@@ -199,7 +227,14 @@ export class MenuService {
     categories[categoryIndex] = updatedCategory;
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'UPDATE', 'menu_category', { categoryId, updatedFields: Object.keys(dto) }, context);
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'UPDATE',
+      'menu_category',
+      { categoryId, updatedFields: Object.keys(dto) },
+      context,
+    );
 
     return updatedCategory;
   }
@@ -207,11 +242,16 @@ export class MenuService {
   /**
    * Delete a category
    */
-  async deleteCategory(businessId: string, categoryId: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
+  async deleteCategory(
+    businessId: string,
+    categoryId: string,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     let categories = menuData?.categories || [];
-    let items = menuData?.items || [];
+    const items = menuData?.items || [];
 
     const categoryIndex = categories.findIndex((c) => c.id === categoryId);
     if (categoryIndex === -1) {
@@ -221,21 +261,36 @@ export class MenuService {
     // Check if category has items
     const categoryItems = items.filter((i) => i.categoryId === categoryId);
     if (categoryItems.length > 0) {
-      throw new BadRequestException(`Cannot delete category with ${categoryItems.length} items. Move or delete items first.`);
+      throw new BadRequestException(
+        `Cannot delete category with ${categoryItems.length} items. Move or delete items first.`,
+      );
     }
 
     categories = categories.filter((c) => c.id !== categoryId);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'DELETE', 'menu_category', { categoryId }, context);
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'DELETE',
+      'menu_category',
+      { categoryId },
+      context,
+    );
 
-    this.logger.log(`Category deleted: ${categoryId} for business ${businessId}`);
+    this.logger.log(
+      `Category deleted: ${categoryId} for business ${businessId}`,
+    );
   }
 
   /**
    * Reorder categories
    */
-  async reorderCategories(businessId: string, categoryIds: string[], userId: string): Promise<MenuCategory[]> {
+  async reorderCategories(
+    businessId: string,
+    categoryIds: string[],
+    userId: string,
+  ): Promise<MenuCategory[]> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
@@ -246,14 +301,27 @@ export class MenuService {
       .map((id, index) => {
         const category = categories.find((c) => c.id === id);
         if (category) {
-          return { ...category, sortOrder: index + 1, updatedAt: new Date().toISOString() };
+          return {
+            ...category,
+            sortOrder: index + 1,
+            updatedAt: new Date().toISOString(),
+          };
         }
         return null;
       })
       .filter((c): c is MenuCategory => c !== null);
 
-    await this.saveMenuData(menuRecord.id, { categories: reorderedCategories, items });
-    await this.createAuditLog(businessId, userId, 'REORDER', 'menu_categories', {});
+    await this.saveMenuData(menuRecord.id, {
+      categories: reorderedCategories,
+      items,
+    });
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'REORDER',
+      'menu_categories',
+      {},
+    );
 
     return reorderedCategories;
   }
@@ -305,7 +373,12 @@ export class MenuService {
   /**
    * Create a new menu item
    */
-  async createItem(businessId: string, dto: CreateMenuItemDto, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<MenuItem> {
+  async createItem(
+    businessId: string,
+    dto: CreateMenuItemDto,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<MenuItem> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
@@ -314,7 +387,9 @@ export class MenuService {
     // Validate category exists
     const categoryExists = categories.some((c) => c.id === dto.categoryId);
     if (!categoryExists) {
-      throw new BadRequestException(`Category with ID ${dto.categoryId} not found`);
+      throw new BadRequestException(
+        `Category with ID ${dto.categoryId} not found`,
+      );
     }
 
     // Process image (upload to Cloudinary if base64)
@@ -344,9 +419,18 @@ export class MenuService {
     items.push(newItem);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'CREATE', 'menu_item', { itemId: newItem.id, name: newItem.name }, context);
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'CREATE',
+      'menu_item',
+      { itemId: newItem.id, name: newItem.name },
+      context,
+    );
 
-    this.logger.log(`Menu item created: ${newItem.name} (${newItem.id}) for business ${businessId}`);
+    this.logger.log(
+      `Menu item created: ${newItem.name} (${newItem.id}) for business ${businessId}`,
+    );
     return newItem;
   }
 
@@ -374,12 +458,17 @@ export class MenuService {
     if (dto.categoryId) {
       const categoryExists = categories.some((c) => c.id === dto.categoryId);
       if (!categoryExists) {
-        throw new BadRequestException(`Category with ID ${dto.categoryId} not found`);
+        throw new BadRequestException(
+          `Category with ID ${dto.categoryId} not found`,
+        );
       }
     }
 
     // Process image (upload to Cloudinary if base64)
-    const imageUrl = dto.image !== undefined ? await this.processImage(dto.image) : items[itemIndex].image;
+    const imageUrl =
+      dto.image !== undefined
+        ? await this.processImage(dto.image)
+        : items[itemIndex].image;
 
     const updatedItem: MenuItem = {
       ...items[itemIndex],
@@ -391,7 +480,14 @@ export class MenuService {
     items[itemIndex] = updatedItem;
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'UPDATE', 'menu_item', { itemId, updatedFields: Object.keys(dto) }, context);
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'UPDATE',
+      'menu_item',
+      { itemId, updatedFields: Object.keys(dto) },
+      context,
+    );
 
     return updatedItem;
   }
@@ -399,7 +495,12 @@ export class MenuService {
   /**
    * Delete a menu item
    */
-  async deleteItem(businessId: string, itemId: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
+  async deleteItem(
+    businessId: string,
+    itemId: string,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
@@ -413,7 +514,14 @@ export class MenuService {
     items = items.filter((i) => i.id !== itemId);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'DELETE', 'menu_item', { itemId }, context);
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'DELETE',
+      'menu_item',
+      { itemId },
+      context,
+    );
 
     this.logger.log(`Menu item deleted: ${itemId} for business ${businessId}`);
   }
@@ -421,9 +529,18 @@ export class MenuService {
   /**
    * Toggle item availability
    */
-  async toggleItemAvailability(businessId: string, itemId: string, userId: string): Promise<MenuItem> {
+  async toggleItemAvailability(
+    businessId: string,
+    itemId: string,
+    userId: string,
+  ): Promise<MenuItem> {
     const item = await this.getItemById(businessId, itemId);
-    return this.updateItem(businessId, itemId, { isAvailable: !item.isAvailable }, userId);
+    return this.updateItem(
+      businessId,
+      itemId,
+      { isAvailable: !item.isAvailable },
+      userId,
+    );
   }
 
   /**
@@ -452,7 +569,10 @@ export class MenuService {
     }
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'BULK_UPDATE', 'menu_items', { itemIds, isAvailable });
+    await this.createAuditLog(businessId, userId, 'BULK_UPDATE', 'menu_items', {
+      itemIds,
+      isAvailable,
+    });
 
     return updatedItems;
   }
@@ -474,9 +594,13 @@ export class MenuService {
       },
     });
 
-    await this.createAuditLog(businessId, userId, 'PUBLISH', 'menu', { version: newVersion });
+    await this.createAuditLog(businessId, userId, 'PUBLISH', 'menu', {
+      version: newVersion,
+    });
 
-    this.logger.log(`Menu published: version ${newVersion} for business ${businessId}`);
+    this.logger.log(
+      `Menu published: version ${newVersion} for business ${businessId}`,
+    );
     return this.getMenu(businessId);
   }
 
@@ -507,12 +631,17 @@ export class MenuService {
   /**
    * Seed default categories for a business
    */
-  async seedDefaultCategories(businessId: string, userId: string): Promise<MenuCategory[]> {
+  async seedDefaultCategories(
+    businessId: string,
+    userId: string,
+  ): Promise<MenuCategory[]> {
     const existingMenu = await this.getMenu(businessId);
 
     // Don't seed if categories already exist
     if (existingMenu.categories.length > 0) {
-      this.logger.log(`Business ${businessId} already has categories, skipping seed`);
+      this.logger.log(
+        `Business ${businessId} already has categories, skipping seed`,
+      );
       return existingMenu.categories;
     }
 
@@ -523,73 +652,111 @@ export class MenuService {
     });
     const businessType = (business?.type || 'restaurant').toLowerCase();
 
-    const categoryMap: Record<string, { name: string; description: string }[]> = {
-      restaurant: [
-        { name: 'Appetizers', description: 'Start your meal with these delicious appetizers' },
-        { name: 'Main Course', description: 'Hearty main dishes' },
-        { name: 'Beverages', description: 'Refreshing drinks' },
-        { name: 'Desserts', description: 'Sweet treats to end your meal' },
-        { name: 'Sides', description: 'Perfect accompaniments' },
-      ],
-      cafe: [
-        { name: 'Hot Drinks', description: 'Coffee, tea, and other hot beverages' },
-        { name: 'Cold Drinks', description: 'Iced coffees, smoothies, and cold beverages' },
-        { name: 'Pastries', description: 'Fresh baked goods and pastries' },
-        { name: 'Sandwiches', description: 'Light meals and sandwiches' },
-        { name: 'Snacks', description: 'Quick bites and light snacks' },
-      ],
-      bar: [
-        { name: 'Cocktails', description: 'Signature and classic cocktails' },
-        { name: 'Beer', description: 'Draft and bottled beers' },
-        { name: 'Wine', description: 'Red, white, and sparkling wines' },
-        { name: 'Spirits', description: 'Premium spirits and liquors' },
-        { name: 'Bar Snacks', description: 'Appetizers and bar bites' },
-      ],
-      salon: [
-        { name: 'Haircuts', description: 'Hair cutting and styling services' },
-        { name: 'Coloring', description: 'Hair coloring and highlights' },
-        { name: 'Treatments', description: 'Hair and scalp treatments' },
-        { name: 'Styling', description: 'Blowouts and special occasion styling' },
-        { name: 'Products', description: 'Retail hair care products' },
-      ],
-      gym: [
-        { name: 'Memberships', description: 'Gym membership plans' },
-        { name: 'Personal Training', description: 'One-on-one training sessions' },
-        { name: 'Group Classes', description: 'Fitness group classes' },
-        { name: 'Supplements', description: 'Nutrition and supplement products' },
-        { name: 'Merchandise', description: 'Gym apparel and accessories' },
-      ],
-      retail: [
-        { name: 'New Arrivals', description: 'Latest products and new stock' },
-        { name: 'Best Sellers', description: 'Top-selling products' },
-        { name: 'Sale', description: 'Discounted items on sale' },
-        { name: 'Accessories', description: 'Add-on accessories and extras' },
-        { name: 'Gift Cards', description: 'Gift cards and vouchers' },
-      ],
-      clinic: [
-        { name: 'Consultations', description: 'Medical consultations and check-ups' },
-        { name: 'Treatments', description: 'Medical treatments and procedures' },
-        { name: 'Lab Tests', description: 'Diagnostic and laboratory tests' },
-        { name: 'Medications', description: 'Prescribed medications' },
-        { name: 'Wellness', description: 'Preventive care and wellness packages' },
-      ],
-      hotel: [
-        { name: 'Room Service', description: 'In-room dining menu' },
-        { name: 'Breakfast', description: 'Morning breakfast options' },
-        { name: 'Lunch & Dinner', description: 'Main dining courses' },
-        { name: 'Beverages', description: 'Drinks and refreshments' },
-        { name: 'Mini Bar', description: 'In-room mini bar selections' },
-      ],
-      spa: [
-        { name: 'Massages', description: 'Massage therapy services' },
-        { name: 'Facials', description: 'Facial treatments and skincare' },
-        { name: 'Body Treatments', description: 'Body wraps, scrubs, and treatments' },
-        { name: 'Packages', description: 'Spa day packages and combos' },
-        { name: 'Products', description: 'Skincare and wellness products' },
-      ],
-    };
+    const categoryMap: Record<string, { name: string; description: string }[]> =
+      {
+        restaurant: [
+          {
+            name: 'Appetizers',
+            description: 'Start your meal with these delicious appetizers',
+          },
+          { name: 'Main Course', description: 'Hearty main dishes' },
+          { name: 'Beverages', description: 'Refreshing drinks' },
+          { name: 'Desserts', description: 'Sweet treats to end your meal' },
+          { name: 'Sides', description: 'Perfect accompaniments' },
+        ],
+        cafe: [
+          {
+            name: 'Hot Drinks',
+            description: 'Coffee, tea, and other hot beverages',
+          },
+          {
+            name: 'Cold Drinks',
+            description: 'Iced coffees, smoothies, and cold beverages',
+          },
+          { name: 'Pastries', description: 'Fresh baked goods and pastries' },
+          { name: 'Sandwiches', description: 'Light meals and sandwiches' },
+          { name: 'Snacks', description: 'Quick bites and light snacks' },
+        ],
+        bar: [
+          { name: 'Cocktails', description: 'Signature and classic cocktails' },
+          { name: 'Beer', description: 'Draft and bottled beers' },
+          { name: 'Wine', description: 'Red, white, and sparkling wines' },
+          { name: 'Spirits', description: 'Premium spirits and liquors' },
+          { name: 'Bar Snacks', description: 'Appetizers and bar bites' },
+        ],
+        salon: [
+          {
+            name: 'Haircuts',
+            description: 'Hair cutting and styling services',
+          },
+          { name: 'Coloring', description: 'Hair coloring and highlights' },
+          { name: 'Treatments', description: 'Hair and scalp treatments' },
+          {
+            name: 'Styling',
+            description: 'Blowouts and special occasion styling',
+          },
+          { name: 'Products', description: 'Retail hair care products' },
+        ],
+        gym: [
+          { name: 'Memberships', description: 'Gym membership plans' },
+          {
+            name: 'Personal Training',
+            description: 'One-on-one training sessions',
+          },
+          { name: 'Group Classes', description: 'Fitness group classes' },
+          {
+            name: 'Supplements',
+            description: 'Nutrition and supplement products',
+          },
+          { name: 'Merchandise', description: 'Gym apparel and accessories' },
+        ],
+        retail: [
+          {
+            name: 'New Arrivals',
+            description: 'Latest products and new stock',
+          },
+          { name: 'Best Sellers', description: 'Top-selling products' },
+          { name: 'Sale', description: 'Discounted items on sale' },
+          { name: 'Accessories', description: 'Add-on accessories and extras' },
+          { name: 'Gift Cards', description: 'Gift cards and vouchers' },
+        ],
+        clinic: [
+          {
+            name: 'Consultations',
+            description: 'Medical consultations and check-ups',
+          },
+          {
+            name: 'Treatments',
+            description: 'Medical treatments and procedures',
+          },
+          { name: 'Lab Tests', description: 'Diagnostic and laboratory tests' },
+          { name: 'Medications', description: 'Prescribed medications' },
+          {
+            name: 'Wellness',
+            description: 'Preventive care and wellness packages',
+          },
+        ],
+        hotel: [
+          { name: 'Room Service', description: 'In-room dining menu' },
+          { name: 'Breakfast', description: 'Morning breakfast options' },
+          { name: 'Lunch & Dinner', description: 'Main dining courses' },
+          { name: 'Beverages', description: 'Drinks and refreshments' },
+          { name: 'Mini Bar', description: 'In-room mini bar selections' },
+        ],
+        spa: [
+          { name: 'Massages', description: 'Massage therapy services' },
+          { name: 'Facials', description: 'Facial treatments and skincare' },
+          {
+            name: 'Body Treatments',
+            description: 'Body wraps, scrubs, and treatments',
+          },
+          { name: 'Packages', description: 'Spa day packages and combos' },
+          { name: 'Products', description: 'Skincare and wellness products' },
+        ],
+      };
 
-    const defaultCategories = categoryMap[businessType] || categoryMap['restaurant'];
+    const defaultCategories =
+      categoryMap[businessType] || categoryMap['restaurant'];
 
     const createdCategories: MenuCategory[] = [];
 
@@ -602,7 +769,9 @@ export class MenuService {
       createdCategories.push(category);
     }
 
-    this.logger.log(`Seeded ${createdCategories.length} ${businessType} categories for business ${businessId}`);
+    this.logger.log(
+      `Seeded ${createdCategories.length} ${businessType} categories for business ${businessId}`,
+    );
     return createdCategories;
   }
 }

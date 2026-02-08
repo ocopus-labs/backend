@@ -53,7 +53,9 @@ export class SubscriptionController {
       session.user.id,
     );
 
-    this.logger.debug(`User ${session.user.id} subscription: plan=${subscription.plan.slug}, status=${subscription.status}`);
+    this.logger.debug(
+      `User ${session.user.id} subscription: plan=${subscription.plan.slug}, status=${subscription.status}`,
+    );
 
     return {
       subscription: {
@@ -144,7 +146,9 @@ export class SubscriptionController {
    */
   @Get('usage')
   async getUsage(@Session() session: UserSession) {
-    const usage = await this.subscriptionService.getCurrentUsage(session.user.id);
+    const usage = await this.subscriptionService.getCurrentUsage(
+      session.user.id,
+    );
     return { usage };
   }
 

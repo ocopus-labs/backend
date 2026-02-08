@@ -11,10 +11,18 @@ export function registerExpenseTools(server: McpServer, ctx: McpContext) {
       'List expenses with optional filters (category, status, date range)',
       {
         categoryId: z.string().optional().describe('Filter by category ID'),
-        status: z.string().optional().describe('Filter by status: pending, approved, rejected, paid'),
+        status: z
+          .string()
+          .optional()
+          .describe('Filter by status: pending, approved, rejected, paid'),
         startDate: z.string().optional().describe('Start date (ISO 8601)'),
         endDate: z.string().optional().describe('End date (ISO 8601)'),
-        limit: z.number().min(1).max(100).default(20).describe('Number of results'),
+        limit: z
+          .number()
+          .min(1)
+          .max(100)
+          .default(20)
+          .describe('Number of results'),
         offset: z.number().min(0).default(0).describe('Pagination offset'),
       },
       async (params) => {
@@ -27,7 +35,9 @@ export function registerExpenseTools(server: McpServer, ctx: McpContext) {
           offset: params.offset,
         });
         await ctx.audit('expense.list', 'expense', null, { filters: params });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -44,8 +54,13 @@ export function registerExpenseTools(server: McpServer, ctx: McpContext) {
           startDate ? new Date(startDate) : undefined,
           endDate ? new Date(endDate) : undefined,
         );
-        await ctx.audit('expense.summary', 'expense', null, { startDate, endDate });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        await ctx.audit('expense.summary', 'expense', null, {
+          startDate,
+          endDate,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -54,9 +69,13 @@ export function registerExpenseTools(server: McpServer, ctx: McpContext) {
       'List all expense categories',
       {},
       async () => {
-        const result = await ctx.expenseService.findAllCategories(ctx.businessId);
+        const result = await ctx.expenseService.findAllCategories(
+          ctx.businessId,
+        );
         await ctx.audit('expense.list_categories', 'expense', null);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
   }
@@ -70,7 +89,9 @@ export function registerExpenseTools(server: McpServer, ctx: McpContext) {
         categoryId: z.string().describe('Expense category ID'),
         amount: z.number().min(0.01).max(999999.99).describe('Amount'),
         expenseDate: z.string().describe('Date of expense (ISO 8601)'),
-        paymentMethod: z.enum(['cash', 'card', 'upi', 'bank_transfer', 'other']).describe('Payment method'),
+        paymentMethod: z
+          .enum(['cash', 'card', 'upi', 'bank_transfer', 'other'])
+          .describe('Payment method'),
         description: z.string().optional().describe('Description'),
         vendorName: z.string().optional().describe('Vendor name'),
         receiptNumber: z.string().optional().describe('Receipt number'),
@@ -94,7 +115,9 @@ export function registerExpenseTools(server: McpServer, ctx: McpContext) {
           title: params.title,
           amount: params.amount,
         });
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
   }

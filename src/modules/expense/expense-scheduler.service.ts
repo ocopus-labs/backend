@@ -32,7 +32,7 @@ export class ExpenseSchedulerService {
 
         const nextDueDate = this.computeNextDueDate(
           expense.createdAt,
-          expense.recurringFrequency as string,
+          expense.recurringFrequency,
         );
 
         if (!nextDueDate || nextDueDate > new Date()) {
@@ -47,7 +47,7 @@ export class ExpenseSchedulerService {
             title: expense.title,
             categoryId: expense.categoryId,
             expenseDate: {
-              gte: this.getPeriodStart(nextDueDate, expense.recurringFrequency as string),
+              gte: this.getPeriodStart(nextDueDate, expense.recurringFrequency),
               lte: nextDueDate,
             },
             id: { not: expense.id },
@@ -76,7 +76,7 @@ export class ExpenseSchedulerService {
             taxAmount: expense.taxAmount,
             taxPercentage: expense.taxPercentage,
             isRecurring: false, // Clone is not itself recurring
-            tags: expense.tags as string[],
+            tags: expense.tags,
             notes: `Auto-generated from recurring expense`,
             status: 'pending',
             createdBy: expense.createdBy,
@@ -96,10 +96,7 @@ export class ExpenseSchedulerService {
     );
   }
 
-  private computeNextDueDate(
-    createdAt: Date,
-    frequency: string,
-  ): Date | null {
+  private computeNextDueDate(createdAt: Date, frequency: string): Date | null {
     const now = new Date();
     const date = new Date(createdAt);
 

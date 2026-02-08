@@ -127,7 +127,8 @@ export const REGIME_CONFIGS: Record<TaxRegime, RegimeConfig> = {
   gst_india: {
     name: 'India GST',
     registrationLabel: 'GSTIN',
-    registrationPattern: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
+    registrationPattern:
+      '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
     componentNames: ['CGST', 'SGST', 'IGST'],
     standardRates: [0, 5, 12, 18, 28],
     taxCodeLabel: 'HSN/SAC Code',
@@ -164,7 +165,8 @@ export const REGIME_CONFIGS: Record<TaxRegime, RegimeConfig> = {
   vat_uk: {
     name: 'UK VAT',
     registrationLabel: 'VAT Number',
-    registrationPattern: '^GB[0-9]{9}$|^GB[0-9]{12}$|^GBGD[0-9]{3}$|^GBHA[0-9]{3}$',
+    registrationPattern:
+      '^GB[0-9]{9}$|^GB[0-9]{12}$|^GBGD[0-9]{3}$|^GBHA[0-9]{3}$',
     componentNames: ['VAT'],
     standardRates: [0, 5, 20],
     taxCodeLabel: 'Commodity Code',

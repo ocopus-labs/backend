@@ -1,5 +1,16 @@
-export type PaymentMethod = 'cash' | 'card' | 'upi' | 'net_banking' | 'wallet' | 'other';
-export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'partially_refunded';
+export type PaymentMethod =
+  | 'cash'
+  | 'card'
+  | 'upi'
+  | 'net_banking'
+  | 'wallet'
+  | 'other';
+export type PaymentStatus =
+  | 'pending'
+  | 'completed'
+  | 'failed'
+  | 'refunded'
+  | 'partially_refunded';
 
 export interface CustomerInfo {
   name?: string;

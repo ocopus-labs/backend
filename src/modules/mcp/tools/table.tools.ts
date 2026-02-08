@@ -13,7 +13,9 @@ export function registerTableTools(server: McpServer, ctx: McpContext) {
       async () => {
         const result = await ctx.tableService.findAll(ctx.businessId);
         await ctx.audit('table.list', 'table', null);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -22,9 +24,14 @@ export function registerTableTools(server: McpServer, ctx: McpContext) {
       'Get details of a specific table including current session',
       { tableId: z.string().describe('The table UUID') },
       async ({ tableId }) => {
-        const result = await ctx.tableService.findByIdOrFail(ctx.businessId, tableId);
+        const result = await ctx.tableService.findByIdOrFail(
+          ctx.businessId,
+          tableId,
+        );
         await ctx.audit('table.read', 'table', tableId);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 
@@ -35,7 +42,9 @@ export function registerTableTools(server: McpServer, ctx: McpContext) {
       async () => {
         const result = await ctx.tableService.getTableStats(ctx.businessId);
         await ctx.audit('table.stats', 'table', null);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
   }
