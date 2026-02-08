@@ -21,6 +21,7 @@ Table restaurants {
   analyticsDailies analytics_daily [not null]
   auditLogs audit_logs [not null]
   businessUsers business_users [not null]
+  customers customers [not null]
   expenseCategories expense_categories [not null]
   expenses expenses [not null]
   inventoryItems inventory_items [not null]
@@ -33,6 +34,7 @@ Table restaurants {
   tables tables [not null]
   usageRecords usage_records [not null]
   apiKeys api_keys [not null]
+  loyaltyAccounts loyalty_accounts [not null]
 }
 
 Table users {
@@ -138,10 +140,33 @@ Table stock_transactions {
   restaurant restaurants [not null]
 }
 
+Table customers {
+  id String [pk]
+  restaurantId String [not null]
+  name String [not null]
+  phone String [not null]
+  email String
+  address Json
+  notes String
+  tags String[] [not null]
+  status String [not null, default: 'active']
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+  orders orders [not null]
+  loyaltyAccount loyalty_accounts
+
+  indexes {
+    (restaurantId, phone) [unique]
+  }
+}
+
 Table orders {
   id String [pk]
   orderNumber String [unique, not null]
   restaurantId String [not null]
+  customerId String
   tableId String
   tableNumber String
   staffId String [not null]
@@ -163,6 +188,7 @@ Table orders {
   deletedAt DateTime
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
+  customer customers
   restaurant restaurants [not null]
   staff users [not null]
   table tables
@@ -364,6 +390,33 @@ Table verification {
   expiresAt DateTime [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [default: `now()`, not null]
+}
+
+Table loyalty_accounts {
+  id String [pk]
+  customerId String [unique, not null]
+  restaurantId String [not null]
+  points Int [not null, default: 0]
+  lifetimePoints Int [not null, default: 0]
+  tier String [not null, default: 'bronze']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  customer customers [not null]
+  restaurant restaurants [not null]
+  transactions loyalty_transactions [not null]
+}
+
+Table loyalty_transactions {
+  id String [pk]
+  loyaltyAccountId String [not null]
+  type String [not null]
+  points Int [not null]
+  balance Int [not null]
+  orderId String
+  description String [not null]
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  account loyalty_accounts [not null]
 }
 
 Table subscription_plans {
@@ -588,6 +641,10 @@ Ref: stock_transactions.inventoryItemId > inventory_items.id [delete: Cascade]
 
 Ref: stock_transactions.restaurantId > restaurants.id [delete: Cascade]
 
+Ref: customers.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: orders.customerId > customers.id
+
 Ref: orders.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: orders.staffId > users.id [delete: Restrict]
@@ -627,6 +684,12 @@ Ref: session.userId > users.id [delete: Cascade]
 Ref: two_factor.userId > users.id [delete: Cascade]
 
 Ref: account.userId > users.id [delete: Cascade]
+
+Ref: loyalty_accounts.customerId - customers.id [delete: Cascade]
+
+Ref: loyalty_accounts.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: loyalty_transactions.loyaltyAccountId > loyalty_accounts.id [delete: Cascade]
 
 Ref: subscriptions.userId > users.id [delete: Cascade]
 

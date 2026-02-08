@@ -30,6 +30,7 @@ model Restaurant {
   analyticsDailies  AnalyticsDaily[]
   auditLogs         AuditLog[]
   businessUsers     BusinessUser[]
+  customers         Customer[]
   expenseCategories ExpenseCategory[]
   expenses          Expense[]
   inventoryItems    InventoryItem[]
@@ -42,6 +43,7 @@ model Restaurant {
   tables            Table[]
   usageRecords      UsageRecord[]
   apiKeys           ApiKey[]
+  loyaltyAccounts   LoyaltyAccount[]
 
   @@index([ownerId])
   @@index([slug])
@@ -174,10 +176,36 @@ model StockTransaction {
   @@map("stock_transactions")
 }
 
+model Customer {
+  id           String     @id @default(uuid())
+  restaurantId String     @map("restaurant_id")
+  name         String
+  phone        String
+  email        String?
+  address      Json?
+  notes        String?    @db.Text
+  tags         String[]   @default([])
+  status       String     @default("active") // active | inactive
+  createdBy    String     @map("created_by")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders       Order[]
+  loyaltyAccount LoyaltyAccount?
+
+  @@unique([restaurantId, phone])
+  @@index([restaurantId, createdAt(sort: Desc)])
+  @@index([restaurantId, phone])
+  @@index([restaurantId, email])
+  @@map("customers")
+}
+
 model Order {
   id                      String     @id @default(uuid())
   orderNumber             String     @unique @map("order_number")
   restaurantId            String     @map("restaurant_id")
+  customerId              String?    @map("customer_id")
   tableId                 String?    @map("table_id")
   tableNumber             String?    @map("table_number")
   staffId                 String     @map("staff_id")
@@ -199,6 +227,7 @@ model Order {
   deletedAt               DateTime?  @map("deleted_at")
   createdAt               DateTime   @default(now()) @map("created_at")
   updatedAt               DateTime   @updatedAt @map("updated_at")
+  customer                Customer?  @relation(fields: [customerId], references: [id])
   restaurant              Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   staff                   User       @relation(fields: [staffId], references: [id], onDelete: Restrict)
   table                   Table?     @relation(fields: [tableId], references: [id])
@@ -206,6 +235,7 @@ model Order {
 
   @@index([restaurantId, createdAt(sort: Desc)])
   @@index([orderNumber])
+  @@index([customerId])
   @@index([tableId])
   @@index([staffId])
   @@index([status])
@@ -455,6 +485,43 @@ model Verification {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@map("verification")
+}
+
+// ==================== LOYALTY MODELS ====================
+
+model LoyaltyAccount {
+  id             String   @id @default(uuid())
+  customerId     String   @unique @map("customer_id")
+  restaurantId   String   @map("restaurant_id")
+  points         Int      @default(0)
+  lifetimePoints Int      @default(0) @map("lifetime_points")
+  tier           String   @default("bronze") // bronze, silver, gold, platinum
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  customer       Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  transactions   LoyaltyTransaction[]
+  @@index([restaurantId])
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyTransaction {
+  id               String   @id @default(uuid())
+  loyaltyAccountId String   @map("loyalty_account_id")
+  type             String   // earn | redeem | adjust | expire
+  points           Int      // positive for earn, negative for redeem
+  balance          Int      // balance after transaction
+  orderId          String?  @map("order_id")
+  description      String
+  createdBy        String?  @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  account          LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+
+  @@index([loyaltyAccountId, createdAt(sort: Desc)])
+  @@index([orderId])
+  @@map("loyalty_transactions")
 }
 
 enum UserRole {
