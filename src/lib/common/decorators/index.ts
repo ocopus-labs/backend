@@ -13,3 +13,4 @@ export {
 export { Roles, ROLES_KEY } from './roles.decorator';
 export { BusinessRoles, BUSINESS_ROLES_KEY } from './business-roles.decorator';
 export { RequirePermission, PERMISSION_KEY } from './require-permission.decorator';
+export { Sanitize } from './sanitize.decorator';
