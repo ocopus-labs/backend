@@ -44,6 +44,7 @@ model Restaurant {
   usageRecords      UsageRecord[]
   apiKeys           ApiKey[]
   loyaltyAccounts   LoyaltyAccount[]
+  invoiceCounters   InvoiceCounter[]
 
   @@index([ownerId])
   @@index([slug])
@@ -182,6 +183,7 @@ model Customer {
   name         String
   phone        String
   email        String?
+  taxId        String?    @map("tax_id")
   address      Json?
   notes        String?    @db.Text
   tags         String[]   @default([])
@@ -204,6 +206,7 @@ model Customer {
 model Order {
   id                      String     @id @default(uuid())
   orderNumber             String     @unique @map("order_number")
+  invoiceNumber           String?    @unique @map("invoice_number")
   restaurantId            String     @map("restaurant_id")
   customerId              String?    @map("customer_id")
   tableId                 String?    @map("table_id")
@@ -485,6 +488,21 @@ model Verification {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@map("verification")
+}
+
+// ==================== INVOICE COUNTER MODEL ====================
+
+model InvoiceCounter {
+  id            String     @id @default(uuid())
+  restaurantId  String     @map("restaurant_id")
+  financialYear String     @map("financial_year")
+  lastNumber    Int        @default(0) @map("last_number")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, financialYear])
+  @@index([restaurantId])
+  @@map("invoice_counters")
 }
 
 // ==================== LOYALTY MODELS ====================

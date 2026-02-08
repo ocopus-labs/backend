@@ -35,6 +35,7 @@ Table restaurants {
   usageRecords usage_records [not null]
   apiKeys api_keys [not null]
   loyaltyAccounts loyalty_accounts [not null]
+  invoiceCounters invoice_counters [not null]
 }
 
 Table users {
@@ -146,6 +147,7 @@ Table customers {
   name String [not null]
   phone String [not null]
   email String
+  taxId String
   address Json
   notes String
   tags String[] [not null]
@@ -165,6 +167,7 @@ Table customers {
 Table orders {
   id String [pk]
   orderNumber String [unique, not null]
+  invoiceNumber String [unique]
   restaurantId String [not null]
   customerId String
   tableId String
@@ -390,6 +393,19 @@ Table verification {
   expiresAt DateTime [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [default: `now()`, not null]
+}
+
+Table invoice_counters {
+  id String [pk]
+  restaurantId String [not null]
+  financialYear String [not null]
+  lastNumber Int [not null, default: 0]
+  updatedAt DateTime [not null]
+  restaurant restaurants [not null]
+
+  indexes {
+    (restaurantId, financialYear) [unique]
+  }
 }
 
 Table loyalty_accounts {
@@ -684,6 +700,8 @@ Ref: session.userId > users.id [delete: Cascade]
 Ref: two_factor.userId > users.id [delete: Cascade]
 
 Ref: account.userId > users.id [delete: Cascade]
+
+Ref: invoice_counters.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: loyalty_accounts.customerId - customers.id [delete: Cascade]
 
