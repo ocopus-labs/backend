@@ -148,6 +148,10 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  customerId?: string;
+
+  @IsOptional()
+  @IsString()
   tableId?: string;
 
   @IsOptional()

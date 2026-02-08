@@ -18,6 +18,7 @@ import type {
 import { OrderGateway } from './order.gateway';
 import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
 import { TableService } from 'src/modules/table/table.service';
+import { LoyaltyService } from 'src/modules/loyalty/loyalty.service';
 
 @Injectable()
 export class OrderService {
@@ -28,6 +29,7 @@ export class OrderService {
     private readonly orderGateway: OrderGateway,
     private readonly usageTrackingService: UsageTrackingService,
     private readonly tableService: TableService,
+    private readonly loyaltyService: LoyaltyService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -165,6 +167,7 @@ export class OrderService {
         data: {
           orderNumber,
           restaurantId: businessId,
+          customerId: dto.customerId || null,
           tableId: dto.tableId || null,
           tableNumber: dto.tableNumber || null,
           staffId,
@@ -411,6 +414,19 @@ export class OrderService {
       } catch (err) {
         // Don't fail the order update if table session end fails
         this.logger.warn(`Failed to end table session for table ${existing.tableId}: ${err}`);
+      }
+    }
+
+    // Award loyalty points when order is completed
+    if (dto.status === 'completed' && existing.customerId) {
+      try {
+        await this.loyaltyService.awardPointsForOrder(
+          businessId,
+          existing.customerId,
+          orderId,
+        );
+      } catch (err) {
+        this.logger.warn(`Failed to award loyalty points: ${err}`);
       }
     }
 
