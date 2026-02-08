@@ -22,6 +22,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
 import { SearchModule } from './modules/search';
+import { McpModule } from './modules/mcp';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { SearchModule } from './modules/search';
     AdminModule,
     AnnouncementModule,
     SearchModule,
+    McpModule,
   ],
   controllers: [AppController],
   providers: [

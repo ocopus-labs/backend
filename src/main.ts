@@ -25,6 +25,9 @@ async function bootstrap() {
     }),
   );
 
+  // Apply JSON body parser for MCP endpoint
+  app.use('/api/mcp', bodyParser.json());
+
   // Parse cookies for impersonation and other cookie-based features
   app.use(cookieParser());
 
