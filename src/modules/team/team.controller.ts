@@ -26,7 +26,7 @@ import {
   UpdateMemberPermissionsDto,
   SuspendMemberDto,
 } from './dto';
-import { BusinessRoles, generateCsv } from 'src/lib/common';
+import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { TeamMemberStatus } from './interfaces';
 
@@ -41,6 +41,7 @@ interface UserSession {
 
 @Controller('business/:businessId/team')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class TeamController {
   private readonly logger = new Logger(TeamController.name);
 
