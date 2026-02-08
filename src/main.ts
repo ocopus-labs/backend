@@ -33,9 +33,11 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Gzip/deflate compression for all responses
-  app.use(compression({
-    threshold: 1024, // Only compress responses > 1KB
-  }));
+  app.use(
+    compression({
+      threshold: 1024, // Only compress responses > 1KB
+    }),
+  );
 
   // Set global API prefix (exclude Better Auth routes and webhook routes)
   app.setGlobalPrefix('api', {

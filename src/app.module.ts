@@ -6,7 +6,11 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RolesGuard, BusinessAccessGuard, HttpCacheInterceptor } from './lib/common';
+import {
+  RolesGuard,
+  BusinessAccessGuard,
+  HttpCacheInterceptor,
+} from './lib/common';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { MailModule } from './modules/mail/mail.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -29,6 +33,7 @@ import { McpModule } from './modules/mcp';
 import { TaxModule } from './modules/tax';
 import { QrModule } from './modules/qr';
 import { CustomerOrderModule } from './modules/customer-order';
+import { FranchiseModule } from './modules/franchise';
 
 @Module({
   imports: [
@@ -57,7 +62,7 @@ import { CustomerOrderModule } from './modules/customer-order';
     CacheModule.register({
       isGlobal: true,
       ttl: 60_000, // Default 60s TTL (in ms)
-      max: 500,    // Max items in cache
+      max: 500, // Max items in cache
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
@@ -82,6 +87,7 @@ import { CustomerOrderModule } from './modules/customer-order';
     TaxModule,
     QrModule,
     CustomerOrderModule,
+    FranchiseModule,
   ],
   controllers: [AppController],
   providers: [
