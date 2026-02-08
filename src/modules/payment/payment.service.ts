@@ -60,8 +60,12 @@ export class PaymentService {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.status !== 'active' && order.paymentStatus === 'paid') {
+    if (order.paymentStatus === 'paid') {
       throw new BadRequestException('Order is already fully paid');
+    }
+
+    if (order.status === 'cancelled') {
+      throw new BadRequestException('Cannot add payment to a cancelled order');
     }
 
     const balanceDue = Number(order.balanceDue);
@@ -123,13 +127,31 @@ export class PaymentService {
         },
       });
 
-      await tx.order.update({
+      const updatedOrder = await tx.order.update({
         where: { id: dto.orderId },
         data: {
           balanceDue: newBalance,
           paymentStatus: newPaymentStatus,
-          status: newBalance <= 0 ? 'completed' : order.status,
         },
+      });
+
+      // Add audit trail entry for payment status change on the order
+      const existingAuditTrail = (updatedOrder.auditTrail as unknown as Array<Record<string, unknown>>) || [];
+      existingAuditTrail.push({
+        action: 'order.payment_received',
+        performedBy: staffId,
+        performedAt: new Date().toISOString(),
+        details: {
+          paymentNumber,
+          amount: dto.amount,
+          method: dto.method,
+          newPaymentStatus,
+          remainingBalance: newBalance,
+        },
+      });
+      await tx.order.update({
+        where: { id: dto.orderId },
+        data: { auditTrail: existingAuditTrail as unknown as object[] },
       });
 
       await tx.auditLog.create({
@@ -267,13 +289,32 @@ export class PaymentService {
         createdPayments.push(payment);
       }
 
-      await tx.order.update({
+      const updatedOrder = await tx.order.update({
         where: { id: dto.orderId },
         data: {
           balanceDue: newBalance,
           paymentStatus: newPaymentStatus,
-          status: newBalance <= 0 ? 'completed' : order.status,
         },
+      });
+
+      // Add audit trail entry for split payment status change on the order
+      const existingAuditTrail = (updatedOrder.auditTrail as unknown as Array<Record<string, unknown>>) || [];
+      existingAuditTrail.push({
+        action: 'order.payment_received',
+        performedBy: staffId,
+        performedAt: new Date().toISOString(),
+        details: {
+          type: 'split',
+          paymentCount: createdPayments.length,
+          totalAmount: totalPaymentAmount,
+          methods: dto.payments.map((p) => p.method),
+          newPaymentStatus,
+          remainingBalance: newBalance,
+        },
+      });
+      await tx.order.update({
+        where: { id: dto.orderId },
+        data: { auditTrail: existingAuditTrail as unknown as object[] },
       });
 
       await tx.auditLog.create({

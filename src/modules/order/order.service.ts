@@ -345,6 +345,20 @@ export class OrderService {
       throw new BadRequestException(`Order is already ${dto.status}`);
     }
 
+    // Validate status transitions — completed and cancelled are terminal states
+    const validTransitions: Record<string, string[]> = {
+      active: ['completed', 'cancelled'],
+      completed: [],
+      cancelled: [],
+    };
+
+    const allowed = validTransitions[existing.status];
+    if (allowed && !allowed.includes(dto.status)) {
+      throw new BadRequestException(
+        `Cannot transition order from '${existing.status}' to '${dto.status}'`,
+      );
+    }
+
     const now = new Date().toISOString();
     const timestamps = existing.timestamps as unknown as OrderTimestamps;
     const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
@@ -470,7 +484,7 @@ export class OrderService {
       data: {
         items: allItems as unknown as object[],
         pricing: pricing as unknown as object,
-        balanceDue: pricing.total - Number(existing.balanceDue) + Number(existing.balanceDue),
+        balanceDue: pricing.total - (Number(existingPricing.total) - Number(existing.balanceDue)),
         auditTrail: auditTrail as unknown as object[],
       },
       include: {
