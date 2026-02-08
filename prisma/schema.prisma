@@ -211,8 +211,9 @@ model Order {
   customerId              String?    @map("customer_id")
   tableId                 String?    @map("table_id")
   tableNumber             String?    @map("table_number")
-  staffId                 String     @map("staff_id")
-  staffName               String     @map("staff_name")
+  staffId                 String?    @map("staff_id")
+  staffName               String?    @map("staff_name")
+  orderSource             String     @default("pos") @map("order_source")
   orderType               String     @map("order_type")
   customerInfo            Json       @map("customer_info")
   items                   Json
@@ -232,7 +233,7 @@ model Order {
   updatedAt               DateTime   @updatedAt @map("updated_at")
   customer                Customer?  @relation(fields: [customerId], references: [id])
   restaurant              Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  staff                   User       @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  staff                   User?      @relation(fields: [staffId], references: [id], onDelete: Restrict)
   table                   Table?     @relation(fields: [tableId], references: [id])
   payments                Payment[]
 

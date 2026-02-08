@@ -172,8 +172,9 @@ Table orders {
   customerId String
   tableId String
   tableNumber String
-  staffId String [not null]
-  staffName String [not null]
+  staffId String
+  staffName String
+  orderSource String [not null, default: 'pos']
   orderType String [not null]
   customerInfo Json [not null]
   items Json [not null]
@@ -193,7 +194,7 @@ Table orders {
   updatedAt DateTime [not null]
   customer customers
   restaurant restaurants [not null]
-  staff users [not null]
+  staff users
   table tables
   payments payments [not null]
 }
