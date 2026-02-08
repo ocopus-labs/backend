@@ -28,6 +28,9 @@ export interface MenuItem {
   preparationTime?: number;
   sortOrder: number;
   modifiers?: MenuItemModifiers;
+  taxCode?: string;
+  taxCategory?: string;
+  customTaxRate?: number;
   createdAt: string;
   updatedAt: string;
 }

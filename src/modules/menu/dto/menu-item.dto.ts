@@ -117,6 +117,21 @@ export class CreateMenuItemDto {
   @Type(() => MenuItemModifiersDto)
   @IsOptional()
   modifiers?: MenuItemModifiersDto;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  taxCode?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  taxCategory?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  customTaxRate?: number;
 }
 
 export class UpdateMenuItemDto {
@@ -173,4 +188,19 @@ export class UpdateMenuItemDto {
   @Type(() => MenuItemModifiersDto)
   @IsOptional()
   modifiers?: MenuItemModifiersDto;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  taxCode?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  taxCategory?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  customTaxRate?: number;
 }

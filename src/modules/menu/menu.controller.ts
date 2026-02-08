@@ -23,7 +23,7 @@ import {
   UpdateCategoryDto,
   ReorderCategoriesDto,
 } from './dto';
-import { BusinessRoles } from 'src/lib/common';
+import { BusinessRoles, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 
 interface UserSession {
@@ -36,6 +36,7 @@ interface UserSession {
 
 @Controller('business/:businessId/menu')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class MenuController {
   private readonly logger = new Logger(MenuController.name);
 
