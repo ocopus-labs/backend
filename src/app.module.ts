@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RolesGuard, BusinessAccessGuard, SanitizationInterceptor } from './lib/common';
+import { RolesGuard, BusinessAccessGuard, HttpCacheInterceptor } from './lib/common';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { MailModule } from './modules/mail/mail.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -25,6 +26,7 @@ import { CustomerModule } from './modules/customer';
 import { LoyaltyModule } from './modules/loyalty';
 import { SearchModule } from './modules/search';
 import { McpModule } from './modules/mcp';
+import { TaxModule } from './modules/tax';
 
 @Module({
   imports: [
@@ -50,6 +52,11 @@ import { McpModule } from './modules/mcp';
         limit: 100,
       },
     ]),
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 60_000, // Default 60s TTL (in ms)
+      max: 500,    // Max items in cache
+    }),
     ScheduleModule.forRoot(),
     PrismaModule,
     MailModule,
@@ -70,6 +77,7 @@ import { McpModule } from './modules/mcp';
     AnnouncementModule,
     SearchModule,
     McpModule,
+    TaxModule,
   ],
   controllers: [AppController],
   providers: [
@@ -88,7 +96,7 @@ import { McpModule } from './modules/mcp';
     },
     {
       provide: APP_INTERCEPTOR,
-      useClass: SanitizationInterceptor,
+      useClass: HttpCacheInterceptor,
     },
   ],
 })

@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import dotenv from 'dotenv';
 import * as bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 
 dotenv.config();
 
@@ -30,6 +31,11 @@ async function bootstrap() {
 
   // Parse cookies for impersonation and other cookie-based features
   app.use(cookieParser());
+
+  // Gzip/deflate compression for all responses
+  app.use(compression({
+    threshold: 1024, // Only compress responses > 1KB
+  }));
 
   // Set global API prefix (exclude Better Auth routes and webhook routes)
   app.setGlobalPrefix('api', {
