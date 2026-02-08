@@ -85,9 +85,13 @@ export class EmailService {
     });
   }
 
-  async sendPasswordResetEmail(to: string, resetToken: string, name: string): Promise<boolean> {
+  async sendPasswordResetEmail(
+    to: string,
+    resetToken: string,
+    name: string,
+  ): Promise<boolean> {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
-    
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">Password Reset Request</h2>
@@ -112,10 +116,10 @@ export class EmailService {
   }
 
   async sendOrderConfirmationEmail(
-    to: string, 
-    orderNumber: string, 
-    customerName: string, 
-    orderDetails: any
+    to: string,
+    orderNumber: string,
+    customerName: string,
+    orderDetails: any,
   ): Promise<boolean> {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -145,7 +149,7 @@ export class EmailService {
     to: string,
     invoiceNumber: string,
     customerName: string,
-    invoiceData: any
+    invoiceData: any,
   ): Promise<boolean> {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

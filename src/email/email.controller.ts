@@ -40,7 +40,9 @@ export class EmailController {
     );
     return {
       success: result,
-      message: result ? 'Welcome email sent successfully' : 'Failed to send welcome email',
+      message: result
+        ? 'Welcome email sent successfully'
+        : 'Failed to send welcome email',
     };
   }
 
@@ -53,7 +55,9 @@ export class EmailController {
     );
     return {
       success: result,
-      message: result ? 'Password reset email sent successfully' : 'Failed to send password reset email',
+      message: result
+        ? 'Password reset email sent successfully'
+        : 'Failed to send password reset email',
     };
   }
 
@@ -72,7 +76,9 @@ export class EmailController {
 
     return {
       success: result,
-      message: result ? `Test email sent successfully to ${to}` : `Failed to send test email to ${to}`,
+      message: result
+        ? `Test email sent successfully to ${to}`
+        : `Failed to send test email to ${to}`,
     };
   }
 }
