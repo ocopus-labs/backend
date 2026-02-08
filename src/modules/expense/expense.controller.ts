@@ -27,7 +27,7 @@ import {
   RejectExpenseDto,
   MarkAsPaidDto,
 } from './dto';
-import { BusinessRoles, generateCsv } from 'src/lib/common';
+import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { ExpenseStatus } from './interfaces';
 
@@ -42,6 +42,7 @@ interface UserSession {
 
 @Controller('business/:businessId/expenses')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class ExpenseController {
   private readonly logger = new Logger(ExpenseController.name);
 
