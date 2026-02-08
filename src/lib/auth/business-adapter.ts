@@ -4,13 +4,23 @@
  * Enables RBAC to work across different business types
  */
 
-export type BusinessType = 'restaurant' | 'salon' | 'gym' | 'cafe' | 'hotel' | 'clinic' | 'spa';
+export type BusinessType =
+  | 'restaurant'
+  | 'salon'
+  | 'gym'
+  | 'cafe'
+  | 'hotel'
+  | 'clinic'
+  | 'spa';
 
 /**
  * Maps business-type-specific resources to generic permission names
  * Example: restaurant "table" → generic "scheduling" resource
  */
-export const BUSINESS_RESOURCE_MAP: Record<BusinessType, Record<string, string>> = {
+export const BUSINESS_RESOURCE_MAP: Record<
+  BusinessType,
+  Record<string, string>
+> = {
   restaurant: {
     order: 'operations',
     menu: 'catalog',
@@ -80,7 +90,10 @@ export function mapBusinessResource(
 /**
  * Get business-specific label for generic resource
  */
-export function getResourceLabel(businessType: BusinessType, genericResource: string): string {
+export function getResourceLabel(
+  businessType: BusinessType,
+  genericResource: string,
+): string {
   const labels: Record<BusinessType, Record<string, string>> = {
     restaurant: {
       operations: 'Orders',
@@ -172,7 +185,9 @@ export function getBusinessOperations(
   const [genericResource, action] = genericPermission.split(':');
   const operations: string[] = [];
   const resourceMap = BUSINESS_RESOURCE_MAP[businessType];
-  for (const [businessResource, mappedResource] of Object.entries(resourceMap)) {
+  for (const [businessResource, mappedResource] of Object.entries(
+    resourceMap,
+  )) {
     if (mappedResource === genericResource) {
       operations.push(`${businessResource}:${action}`);
     }

@@ -1,28 +1,28 @@
 /**
  * User Roles - Proper Hierarchy
- * 
+ *
  * SUPER_ADMIN (Platform Owner)
  * ├── Manage all franchises
  * ├── Manage subscriptions & billing
  * ├── Manage users across platform
  * └── View platform analytics
- * 
+ *
  * FRANCHISE_OWNER (Franchise Owner)
  * ├── Manage multiple restaurants in their franchise
  * ├── Manage franchise staff
  * ├── Manage franchise billing
  * └── View franchise analytics
- * 
+ *
  * RESTAURANT_OWNER (Single Restaurant Owner)
  * ├── Manage their restaurant
  * ├── Manage restaurant staff
  * └── View restaurant analytics
- * 
+ *
  * MANAGER (Restaurant Manager)
  * ├── Day-to-day operations
  * ├── Staff management (limited)
  * └── Order & payment processing
- * 
+ *
  * STAFF (Restaurant Staff)
  * └── Order & basic operations
  */
@@ -37,7 +37,7 @@ export const USER_ROLES = {
   ACCOUNTANT: 'accountant',
 } as const;
 
-export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
+export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 
 /**
  * Generic Business Resource Actions
