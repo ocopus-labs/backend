@@ -20,6 +20,14 @@ export class MailConfigService {
     );
   }
 
+  get appUrl(): string {
+    return this.configService.get<string>('APP_URL', 'http://localhost:5173');
+  }
+
+  get appName(): string {
+    return this.configService.get<string>('APP_NAME', 'POS Platform');
+  }
+
   isConfigured(): boolean {
     return !!this.apiKey;
   }

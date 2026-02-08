@@ -1,7 +1,206 @@
 import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { betterAuth } from 'better-auth';
+import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { admin } from 'better-auth/plugins';
 
 const prisma = new PrismaClient();
+
+// Create a minimal auth instance for seeding (without mail service dependencies)
+const createSeedAuth = () => {
+  if (!process.env.BETTER_AUTH_SECRET) {
+    throw new Error('BETTER_AUTH_SECRET environment variable is not set');
+  }
+
+  return betterAuth({
+    baseURL: process.env.AUTH_BASE_URL || 'http://localhost:3000',
+    basePath: '/api/auth',
+    secret: process.env.BETTER_AUTH_SECRET,
+    database: prismaAdapter(prisma, {
+      provider: 'postgresql',
+    }),
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+      maxPasswordLength: 128,
+      requireEmailVerification: false, // Skip for seeding
+    },
+    plugins: [
+      admin({
+        defaultRole: 'user',
+        adminRoles: ['admin'],
+      }),
+    ],
+  });
+};
+
+// Seed super admin user
+async function seedSuperAdmin() {
+  console.log('🌱 Starting super admin seeding...');
+
+  const email = process.env.SUPER_ADMIN_EMAIL;
+  const password = process.env.SUPER_ADMIN_PASSWORD;
+  const name = process.env.SUPER_ADMIN_NAME || 'Super Admin';
+
+  if (!email || !password) {
+    console.log(
+      '   ⚠️  SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD not set, skipping super admin creation',
+    );
+    return;
+  }
+
+  // Check if admin already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingUser) {
+    console.log(`   ⏭️  Super admin '${email}' already exists`);
+
+    // Ensure the user has super_admin role
+    if (existingUser.role !== 'super_admin') {
+      await prisma.user.update({
+        where: { email },
+        data: { role: 'super_admin', emailVerified: true },
+      });
+      console.log(`   ✅ Updated '${email}' to super_admin role`);
+    }
+    return;
+  }
+
+  try {
+    const auth = createSeedAuth();
+
+    // Create user using Better Auth API
+    const result = await auth.api.signUpEmail({
+      body: {
+        email,
+        password,
+        name,
+      },
+    });
+
+    if (!result || 'error' in result) {
+      throw new Error(`Failed to create super admin: ${JSON.stringify(result)}`);
+    }
+
+    // Update the user to have super_admin role and verified email
+    await prisma.user.update({
+      where: { email },
+      data: {
+        role: 'super_admin',
+        emailVerified: true,
+      },
+    });
+
+    console.log(`   ✅ Created super admin: ${email}`);
+  } catch (error) {
+    console.error('   ❌ Failed to create super admin:', error);
+    throw error;
+  }
+}
+
+
+// Subscription plan seed data
+async function seedSubscriptionPlans() {
+  console.log('🌱 Starting subscription plan seeding...');
+
+  const plans = [
+    {
+      name: 'FREE',
+      slug: 'free',
+      displayName: 'Free',
+      description: 'Get started with basic POS features',
+      priceMonthly: 0,
+      priceYearly: 0,
+      currency: 'INR',
+      dodoProductId: null, // Free plan doesn't need a Dodo product
+      maxLocations: 1,
+      maxTeamMembers: 2,
+      maxOrdersPerMonth: 100,
+      features: {
+        kitchenDisplay: false,
+        analytics: 'basic',
+        inventory: false,
+        expenses: false,
+        api: false,
+        whiteLabel: false,
+      },
+      isPublic: true,
+      sortOrder: 0,
+      status: 'active',
+    },
+    {
+      name: 'PRO',
+      slug: 'pro',
+      displayName: 'Pro',
+      description: 'For growing businesses with advanced needs',
+      priceMonthly: 2499,
+      priceYearly: 24990, // 2 months free
+      currency: 'INR',
+      dodoProductId: process.env.DODO_PRODUCT_PRO || null,
+      maxLocations: 5,
+      maxTeamMembers: 15,
+      maxOrdersPerMonth: -1, // unlimited
+      features: {
+        kitchenDisplay: true,
+        analytics: 'advanced',
+        inventory: true,
+        expenses: true,
+        api: false,
+        whiteLabel: false,
+      },
+      isPublic: true,
+      sortOrder: 1,
+      status: 'active',
+    },
+    {
+      name: 'ENTERPRISE',
+      slug: 'enterprise',
+      displayName: 'Enterprise',
+      description: 'For large businesses and franchises',
+      priceMonthly: 8499,
+      priceYearly: 84990, // 2 months free
+      currency: 'INR',
+      dodoProductId: process.env.DODO_PRODUCT_ENTERPRISE || null,
+      maxLocations: -1, // unlimited
+      maxTeamMembers: -1, // unlimited
+      maxOrdersPerMonth: -1, // unlimited
+      features: {
+        kitchenDisplay: true,
+        analytics: 'advanced',
+        inventory: true,
+        expenses: true,
+        api: true,
+        whiteLabel: true,
+      },
+      isPublic: true,
+      sortOrder: 2,
+      status: 'active',
+    },
+  ];
+
+  for (const plan of plans) {
+    const existing = await prisma.subscriptionPlan.findUnique({
+      where: { slug: plan.slug },
+    });
+
+    if (existing) {
+      console.log(`   ⏭️  Plan '${plan.name}' already exists, updating...`);
+      await prisma.subscriptionPlan.update({
+        where: { slug: plan.slug },
+        data: plan,
+      });
+    } else {
+      await prisma.subscriptionPlan.create({
+        data: plan,
+      });
+      console.log(`   ✅ Created plan: ${plan.name}`);
+    }
+  }
+
+  console.log('🎉 Subscription plan seeding completed!');
+}
 
 // High-quality food images from Unsplash (free to use)
 const images = {
@@ -795,9 +994,11 @@ async function seedMenuItems() {
 
 async function main() {
   try {
+    await seedSuperAdmin();
+    // await seedSubscriptionPlans();
     await seedMenuItems();
   } catch (error) {
-    console.error('❌ Error seeding menu items:', error);
+    console.error('❌ Error seeding:', error);
     throw error;
   } finally {
     await prisma.$disconnect();

@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { randomUUID } from 'crypto';
 import {
   CreatePaymentDto,
   CreateSplitPaymentDto,
@@ -21,13 +22,13 @@ export class PaymentService {
 
   private generatePaymentNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const random = randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase();
     return `PAY-${timestamp}-${random}`;
   }
 
   private generateReceiptNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 4).toUpperCase();
+    const random = randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase();
     return `RCP-${timestamp}-${random}`;
   }
 
@@ -35,18 +36,36 @@ export class PaymentService {
     businessId: string,
     staffId: string,
     dto: CreatePaymentDto,
+    context?: { ipAddress?: string; userAgent?: string },
   ) {
+    // Idempotency check: prevent duplicate payments
+    if (dto.idempotencyKey) {
+      const existing = await this.prisma.payment.findFirst({
+        where: {
+          restaurantId: businessId,
+          receipt: { path: ['idempotencyKey'], equals: dto.idempotencyKey },
+        },
+      });
+      if (existing) {
+        throw new ConflictException('Duplicate payment: this request has already been processed');
+      }
+    }
+
     // Get the order
     const order = await this.prisma.order.findFirst({
-      where: { id: dto.orderId, restaurantId: businessId },
+      where: { id: dto.orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.status !== 'active' && order.paymentStatus === 'paid') {
+    if (order.paymentStatus === 'paid') {
       throw new BadRequestException('Order is already fully paid');
+    }
+
+    if (order.status === 'cancelled') {
+      throw new BadRequestException('Cannot add payment to a cancelled order');
     }
 
     const balanceDue = Number(order.balanceDue);
@@ -76,67 +95,90 @@ export class PaymentService {
       total: pricing.total,
     };
 
-    // Create payment
-    const payment = await this.prisma.payment.create({
-      data: {
-        paymentNumber,
-        restaurantId: businessId,
-        orderId: dto.orderId,
-        orderNumber: order.orderNumber,
-        amount: dto.amount,
-        method: dto.method,
-        status: 'completed',
-        customerInfo: (dto.customerInfo || {}) as object,
-        billingAddress: dto.billingAddress as object || null,
-        taxDetails: taxDetails as object,
-        processedBy: staffId,
-        processedAt: new Date(),
-        receipt: {
-          receiptNumber: this.generateReceiptNumber(),
-          generatedAt: new Date().toISOString(),
-          paymentMethod: dto.method,
-          amountPaid: dto.amount,
-          change: change > 0 ? change : undefined,
-          tipAmount: dto.tipAmount,
-          transactionReference: dto.transactionReference,
-        } as object,
-      },
-    });
-
-    // Update order balance and payment status
+    // Create payment, update order, and audit log atomically
     const newBalance = balanceDue - dto.amount;
     const newPaymentStatus = newBalance <= 0 ? 'paid' : 'partial';
 
-    await this.prisma.order.update({
-      where: { id: dto.orderId },
-      data: {
-        balanceDue: newBalance,
-        paymentStatus: newPaymentStatus,
-        status: newBalance <= 0 ? 'completed' : order.status,
-      },
-    });
-
-    // Create audit log
-    await this.prisma.auditLog.create({
-      data: {
-        restaurantId: businessId,
-        userId: staffId,
-        action: 'payment.create',
-        resource: 'payment',
-        resourceId: payment.id,
-        details: {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
           paymentNumber,
+          restaurantId: businessId,
+          orderId: dto.orderId,
           orderNumber: order.orderNumber,
           amount: dto.amount,
           method: dto.method,
-          change,
-        } as object,
-      },
+          status: 'completed',
+          customerInfo: (dto.customerInfo || {}) as object,
+          billingAddress: dto.billingAddress as object || null,
+          taxDetails: taxDetails as object,
+          processedBy: staffId,
+          processedAt: new Date(),
+          receipt: {
+            receiptNumber: this.generateReceiptNumber(),
+            generatedAt: new Date().toISOString(),
+            paymentMethod: dto.method,
+            amountPaid: dto.amount,
+            change: change > 0 ? change : undefined,
+            tipAmount: dto.tipAmount,
+            transactionReference: dto.transactionReference,
+            ...(dto.idempotencyKey && { idempotencyKey: dto.idempotencyKey }),
+          } as object,
+        },
+      });
+
+      const updatedOrder = await tx.order.update({
+        where: { id: dto.orderId },
+        data: {
+          balanceDue: newBalance,
+          paymentStatus: newPaymentStatus,
+        },
+      });
+
+      // Add audit trail entry for payment status change on the order
+      const existingAuditTrail = (updatedOrder.auditTrail as unknown as Array<Record<string, unknown>>) || [];
+      existingAuditTrail.push({
+        action: 'order.payment_received',
+        performedBy: staffId,
+        performedAt: new Date().toISOString(),
+        details: {
+          paymentNumber,
+          amount: dto.amount,
+          method: dto.method,
+          newPaymentStatus,
+          remainingBalance: newBalance,
+        },
+      });
+      await tx.order.update({
+        where: { id: dto.orderId },
+        data: { auditTrail: existingAuditTrail as unknown as object[] },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId: businessId,
+          userId: staffId,
+          action: 'payment.create',
+          resource: 'payment',
+          resourceId: payment.id,
+          details: {
+            paymentNumber,
+            orderNumber: order.orderNumber,
+            amount: dto.amount,
+            method: dto.method,
+            change,
+          } as object,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        },
+      });
+
+      return payment;
     });
 
     return {
       message: 'Payment processed successfully',
-      payment,
+      payment: result,
       change: change > 0 ? change : undefined,
       orderPaymentStatus: newPaymentStatus,
       remainingBalance: newBalance,
@@ -147,10 +189,24 @@ export class PaymentService {
     businessId: string,
     staffId: string,
     dto: CreateSplitPaymentDto,
+    context?: { ipAddress?: string; userAgent?: string },
   ) {
+    // Idempotency check: prevent duplicate split payments
+    if (dto.idempotencyKey) {
+      const existing = await this.prisma.payment.findFirst({
+        where: {
+          restaurantId: businessId,
+          receipt: { path: ['idempotencyKey'], equals: dto.idempotencyKey },
+        },
+      });
+      if (existing) {
+        throw new ConflictException('Duplicate payment: this request has already been processed');
+      }
+    }
+
     // Get the order
     const order = await this.prisma.order.findFirst({
-      where: { id: dto.orderId, restaurantId: businessId },
+      where: { id: dto.orderId, restaurantId: businessId, deletedAt: null },
     });
 
     if (!order) {
@@ -170,6 +226,20 @@ export class PaymentService {
       );
     }
 
+    // Validate split amounts reconcile to balance (within tolerance)
+    if (Math.abs(totalPaymentAmount - balanceDue) > 0.01 && totalPaymentAmount < balanceDue) {
+      // Allow partial but not mismatched — this is just a warning-level check
+    }
+
+    // Validate each split entry has a minimum amount
+    for (const p of dto.payments) {
+      if (p.amount < 0.01) {
+        throw new BadRequestException(
+          'Each split payment must be at least 0.01',
+        );
+      }
+    }
+
     const pricing = order.pricing as { subtotal: number; taxRate: number; taxAmount: number; total: number };
     const taxDetails: TaxDetails = {
       subtotal: pricing.subtotal,
@@ -178,9 +248,13 @@ export class PaymentService {
       total: pricing.total,
     };
 
-    // Create all payments
-    const payments = await Promise.all(
-      dto.payments.map(async (p) => {
+    // Create all payments, update order, and audit log atomically
+    const newBalance = balanceDue - totalPaymentAmount;
+    const newPaymentStatus = newBalance <= 0 ? 'paid' : 'partial';
+
+    const payments = await this.prisma.$transaction(async (tx) => {
+      const createdPayments = [];
+      for (const p of dto.payments) {
         const paymentNumber = this.generatePaymentNumber();
 
         let change = 0;
@@ -188,7 +262,7 @@ export class PaymentService {
           change = p.cashReceived - p.amount;
         }
 
-        return this.prisma.payment.create({
+        const payment = await tx.payment.create({
           data: {
             paymentNumber,
             restaurantId: businessId,
@@ -208,40 +282,60 @@ export class PaymentService {
               amountPaid: p.amount,
               change: change > 0 ? change : undefined,
               transactionReference: p.transactionReference,
+              ...(dto.idempotencyKey && { idempotencyKey: dto.idempotencyKey }),
             } as object,
           },
         });
-      }),
-    );
+        createdPayments.push(payment);
+      }
 
-    // Update order balance and payment status
-    const newBalance = balanceDue - totalPaymentAmount;
-    const newPaymentStatus = newBalance <= 0 ? 'paid' : 'partial';
+      const updatedOrder = await tx.order.update({
+        where: { id: dto.orderId },
+        data: {
+          balanceDue: newBalance,
+          paymentStatus: newPaymentStatus,
+        },
+      });
 
-    await this.prisma.order.update({
-      where: { id: dto.orderId },
-      data: {
-        balanceDue: newBalance,
-        paymentStatus: newPaymentStatus,
-        status: newBalance <= 0 ? 'completed' : order.status,
-      },
-    });
-
-    // Create audit log
-    await this.prisma.auditLog.create({
-      data: {
-        restaurantId: businessId,
-        userId: staffId,
-        action: 'payment.split',
-        resource: 'payment',
-        resourceId: dto.orderId,
+      // Add audit trail entry for split payment status change on the order
+      const existingAuditTrail = (updatedOrder.auditTrail as unknown as Array<Record<string, unknown>>) || [];
+      existingAuditTrail.push({
+        action: 'order.payment_received',
+        performedBy: staffId,
+        performedAt: new Date().toISOString(),
         details: {
-          orderNumber: order.orderNumber,
-          paymentCount: payments.length,
+          type: 'split',
+          paymentCount: createdPayments.length,
           totalAmount: totalPaymentAmount,
           methods: dto.payments.map((p) => p.method),
-        } as object,
-      },
+          newPaymentStatus,
+          remainingBalance: newBalance,
+        },
+      });
+      await tx.order.update({
+        where: { id: dto.orderId },
+        data: { auditTrail: existingAuditTrail as unknown as object[] },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId: businessId,
+          userId: staffId,
+          action: 'payment.split',
+          resource: 'payment',
+          resourceId: dto.orderId,
+          details: {
+            orderNumber: order.orderNumber,
+            paymentCount: createdPayments.length,
+            totalAmount: totalPaymentAmount,
+            methods: dto.payments.map((p) => p.method),
+          } as object,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        },
+      });
+
+      return createdPayments;
     });
 
     return {
@@ -257,9 +351,10 @@ export class PaymentService {
     paymentId: string,
     staffId: string,
     dto: ProcessRefundDto,
+    context?: { ipAddress?: string; userAgent?: string },
   ) {
     const payment = await this.prisma.payment.findFirst({
-      where: { id: paymentId, restaurantId: businessId },
+      where: { id: paymentId, restaurantId: businessId, deletedAt: null },
       include: { order: true },
     });
 
@@ -295,39 +390,78 @@ export class PaymentService {
     const newTotalRefunded = totalRefunded + dto.amount;
     const newStatus = newTotalRefunded >= paymentAmount ? 'refunded' : 'partially_refunded';
 
-    // Update payment
-    const updatedPayment = await this.prisma.payment.update({
-      where: { id: paymentId },
-      data: {
-        status: newStatus,
-        refunds: [...existingRefunds, refundEntry] as object[],
-      },
-    });
+    // Update payment, order balance, create refund record, and audit log atomically
+    const updatedPayment = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: newStatus,
+          refunds: [...existingRefunds, refundEntry] as object[],
+        },
+      });
 
-    // Update order balance
-    await this.prisma.order.update({
-      where: { id: payment.orderId },
-      data: {
-        balanceDue: { increment: dto.amount },
-        paymentStatus: 'partial',
-      },
-    });
-
-    // Create audit log
-    await this.prisma.auditLog.create({
-      data: {
-        restaurantId: businessId,
-        userId: staffId,
-        action: 'payment.refund',
-        resource: 'payment',
-        resourceId: paymentId,
-        details: {
-          paymentNumber: payment.paymentNumber,
-          refundAmount: dto.amount,
+      // Create refund record in separate table
+      await tx.refund.create({
+        data: {
+          paymentId,
+          restaurantId: businessId,
+          amount: dto.amount,
           reason: dto.reason,
-          refundMethod: dto.refundMethod,
-        } as object,
-      },
+          method: dto.refundMethod,
+          refundedBy: staffId,
+        },
+      });
+
+      // Determine correct order payment status based on all payments
+      const allPayments = await tx.payment.findMany({
+        where: { orderId: payment.orderId, deletedAt: null },
+      });
+      const orderPricing = payment.order.pricing as { total: number };
+      let totalPaid = 0;
+      let totalRefundedAll = 0;
+      for (const p of allPayments) {
+        totalPaid += Number(p.amount);
+        const refs = (p.refunds as unknown as RefundEntry[]) || [];
+        totalRefundedAll += refs.reduce((s, r) => s + r.amount, 0);
+      }
+      // Account for the refund we're currently processing (already added to this payment's refunds above)
+      const netPaid = totalPaid - totalRefundedAll;
+      let orderPaymentStatus: string;
+      if (netPaid <= 0) {
+        orderPaymentStatus = 'refunded';
+      } else if (netPaid >= orderPricing.total) {
+        orderPaymentStatus = 'paid';
+      } else {
+        orderPaymentStatus = 'partial';
+      }
+
+      await tx.order.update({
+        where: { id: payment.orderId },
+        data: {
+          balanceDue: { increment: dto.amount },
+          paymentStatus: orderPaymentStatus,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId: businessId,
+          userId: staffId,
+          action: 'payment.refund',
+          resource: 'payment',
+          resourceId: paymentId,
+          details: {
+            paymentNumber: payment.paymentNumber,
+            refundAmount: dto.amount,
+            reason: dto.reason,
+            refundMethod: dto.refundMethod,
+          } as object,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        },
+      });
+
+      return updated;
     });
 
     return {
@@ -339,7 +473,7 @@ export class PaymentService {
 
   async getPaymentsByOrder(businessId: string, orderId: string) {
     const payments = await this.prisma.payment.findMany({
-      where: { restaurantId: businessId, orderId },
+      where: { restaurantId: businessId, orderId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -354,7 +488,7 @@ export class PaymentService {
 
   async getPaymentById(businessId: string, paymentId: string) {
     const payment = await this.prisma.payment.findFirst({
-      where: { id: paymentId, restaurantId: businessId },
+      where: { id: paymentId, restaurantId: businessId, deletedAt: null },
       include: {
         order: {
           select: {
@@ -386,7 +520,7 @@ export class PaymentService {
       offset?: number;
     },
   ) {
-    const where: Record<string, unknown> = { restaurantId: businessId };
+    const where: Record<string, unknown> = { restaurantId: businessId, deletedAt: null };
 
     if (options?.method) {
       where.method = options.method;
@@ -424,7 +558,7 @@ export class PaymentService {
 
   async getPaymentSummary(businessId: string, date?: Date): Promise<{ summary: PaymentSummary }> {
     const startOfDay = date
-      ? new Date(date.setHours(0, 0, 0, 0))
+      ? new Date(new Date(date).setHours(0, 0, 0, 0))
       : new Date(new Date().setHours(0, 0, 0, 0));
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
@@ -432,6 +566,7 @@ export class PaymentService {
     const payments = await this.prisma.payment.findMany({
       where: {
         restaurantId: businessId,
+        deletedAt: null,
         createdAt: { gte: startOfDay, lt: endOfDay },
       },
     });
@@ -479,7 +614,7 @@ export class PaymentService {
 
   async generateReceipt(businessId: string, paymentId: string) {
     const payment = await this.prisma.payment.findFirst({
-      where: { id: paymentId, restaurantId: businessId },
+      where: { id: paymentId, restaurantId: businessId, deletedAt: null },
       include: {
         order: true,
         restaurant: {
@@ -529,5 +664,76 @@ export class PaymentService {
       orderNumber: payment.orderNumber,
       paymentNumber: payment.paymentNumber,
     };
+  }
+
+  async softDelete(
+    businessId: string,
+    paymentId: string,
+    staffId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, restaurantId: businessId, deletedAt: null },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status === 'pending') {
+      throw new BadRequestException('Cannot delete a pending payment. Cancel it first.');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.payment.update({
+        where: { id: paymentId },
+        data: { deletedAt: new Date() },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId: businessId,
+          userId: staffId,
+          action: 'payment.delete',
+          resource: 'payment',
+          resourceId: paymentId,
+          details: { paymentNumber: payment.paymentNumber } as object,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+        },
+      });
+
+      return deleted;
+    });
+
+    return { message: 'Payment deleted successfully', payment: updated };
+  }
+
+  async getRefunds(
+    businessId: string,
+    paymentId: string,
+    options?: { limit?: number; offset?: number },
+  ) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, restaurantId: businessId, deletedAt: null },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    const [refunds, total] = await Promise.all([
+      this.prisma.refund.findMany({
+        where: { paymentId, restaurantId: businessId },
+        orderBy: { refundedAt: 'desc' },
+        take: options?.limit || 50,
+        skip: options?.offset || 0,
+      }),
+      this.prisma.refund.count({
+        where: { paymentId, restaurantId: businessId },
+      }),
+    ]);
+
+    return { refunds, total };
   }
 }

@@ -1,17 +1,37 @@
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import dotenv from 'dotenv';
+import * as bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   // Disable body parser for Better Auth
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
   });
 
-  // Set global API prefix (exclude Better Auth routes which handle their own /api/auth path)
-  app.setGlobalPrefix('api');
+  // Apply raw body capture for webhook routes BEFORE any other middleware
+  // This must be done first to capture the raw body for signature verification
+  app.use(
+    '/webhook/dodo',
+    bodyParser.json({
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf.toString('utf8');
+      },
+    }),
+  );
+
+  // Parse cookies for impersonation and other cookie-based features
+  app.use(cookieParser());
+
+  // Set global API prefix (exclude Better Auth routes and webhook routes)
+  app.setGlobalPrefix('api', {
+    exclude: ['webhook/dodo'],
+  });
 
   // Enable CORS for frontend
   app.enableCors({
@@ -19,13 +39,8 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app
-    .listen(process.env.PORT ?? 3000)
-    .then(() =>
-      console.log(`Server is running on port ${process.env.PORT ?? 3000}`),
-    )
-    .catch((err) => {
-      console.error('Error starting server:', err);
-    });
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+  logger.log(`Server is running on port ${port}`);
 }
 bootstrap();

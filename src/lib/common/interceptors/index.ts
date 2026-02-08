@@ -1,2 +1,1 @@
-// Export interceptors as they are created
-export {};
+export { SanitizationInterceptor } from './sanitization.interceptor';

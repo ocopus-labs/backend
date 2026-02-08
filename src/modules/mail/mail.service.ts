@@ -5,14 +5,48 @@ import {
   SendEmailResponse,
 } from './interfaces/mail.interface';
 import { MailConfigService } from './mail-config.service';
+import {
+  welcomeEmailTemplate,
+  verificationEmailTemplate,
+  passwordResetEmailTemplate,
+  passwordChangedEmailTemplate,
+  notificationEmailTemplate,
+  invoiceEmailTemplate,
+  paymentReceiptTemplate,
+  subscriptionActivatedTemplate,
+  paymentSuccessTemplate,
+  paymentFailedTemplate,
+  subscriptionCancelledTemplate,
+  trialEndingTemplate,
+  type WelcomeEmailData,
+  type VerificationEmailData,
+  type PasswordResetEmailData,
+  type PasswordChangedEmailData,
+  type NotificationEmailData,
+  type InvoiceData,
+  type PaymentReceiptData,
+  type SubscriptionActivatedData,
+  type PaymentSuccessData,
+  type PaymentFailedData,
+  type SubscriptionCancelledData,
+  type TrialEndingData,
+  type TemplateConfig,
+} from './templates';
 
 @Injectable()
 export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
   private resend: Resend;
   private isConfigured = false;
+  private templateConfig: Partial<TemplateConfig>;
 
-  constructor(private mailConfigService: MailConfigService) {}
+  constructor(private mailConfigService: MailConfigService) {
+    this.templateConfig = {
+      appName: 'POS Platform',
+      appUrl: this.mailConfigService.appUrl || 'http://localhost:5173',
+      supportEmail: this.mailConfigService.from,
+    };
+  }
 
   onModuleInit() {
     const apiKey = this.mailConfigService.apiKey;
@@ -118,98 +152,207 @@ export class MailService implements OnModuleInit {
     }
   }
 
+  // ============================================
+  // Authentication & Transactional Emails
+  // ============================================
+
   /**
    * Send a welcome email
-   * @param email User email
-   * @param name User name
    */
   async sendWelcomeEmail(
     email: string,
-    name: string,
+    data: Omit<WelcomeEmailData, 'email'>,
   ): Promise<SendEmailResponse> {
-    const html = `
-      <h1>Welcome, ${name}!</h1>
-      <p>Thank you for signing up. We're excited to have you on board.</p>
-    `;
-
+    const template = welcomeEmailTemplate({ ...data, email }, this.templateConfig);
     return this.send({
       to: email,
-      subject: 'Welcome to our platform!',
-      html,
-      text: `Welcome, ${name}! Thank you for signing up.`,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
     });
   }
 
   /**
    * Send a verification email
-   * @param email User email
-   * @param verificationLink Verification link
    */
   async sendVerificationEmail(
     email: string,
-    verificationLink: string,
+    data: Omit<VerificationEmailData, 'email'>,
   ): Promise<SendEmailResponse> {
-    const html = `
-      <h1>Verify Your Email</h1>
-      <p>Please click the link below to verify your email address:</p>
-      <a href="${verificationLink}">Verify Email</a>
-      <p>This link will expire in 24 hours.</p>
-    `;
-
+    const template = verificationEmailTemplate(data, this.templateConfig);
     return this.send({
       to: email,
-      subject: 'Verify your email address',
-      html,
-      text: `Please verify your email by visiting: ${verificationLink}`,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
     });
   }
 
   /**
    * Send a password reset email
-   * @param email User email
-   * @param resetLink Password reset link
    */
   async sendPasswordResetEmail(
     email: string,
-    resetLink: string,
+    data: Omit<PasswordResetEmailData, 'email'>,
   ): Promise<SendEmailResponse> {
-    const html = `
-      <h1>Reset Your Password</h1>
-      <p>Click the link below to reset your password:</p>
-      <a href="${resetLink}">Reset Password</a>
-      <p>This link will expire in 1 hour.</p>
-      <p>If you didn't request this, please ignore this email.</p>
-    `;
-
+    const template = passwordResetEmailTemplate(data, this.templateConfig);
     return this.send({
       to: email,
-      subject: 'Password reset request',
-      html,
-      text: `Reset your password by visiting: ${resetLink}`,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  /**
+   * Send password changed confirmation email
+   */
+  async sendPasswordChangedEmail(
+    email: string,
+    data: PasswordChangedEmailData,
+  ): Promise<SendEmailResponse> {
+    const template = passwordChangedEmailTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
     });
   }
 
   /**
    * Send a notification email
-   * @param email User email
-   * @param title Notification title
-   * @param message Notification message
    */
   async sendNotification(
     email: string,
-    title: string,
-    message: string,
+    data: NotificationEmailData,
   ): Promise<SendEmailResponse> {
-    const html = `
-      <h2>${title}</h2>
-      <p>${message}</p>
-    `;
-
+    const template = notificationEmailTemplate(data, this.templateConfig);
     return this.send({
       to: email,
-      subject: title,
-      html,
-      text: message,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  // ============================================
+  // Invoice & Payment Emails
+  // ============================================
+
+  /**
+   * Send an invoice email
+   */
+  async sendInvoiceEmail(
+    email: string,
+    data: InvoiceData,
+  ): Promise<SendEmailResponse> {
+    const template = invoiceEmailTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  /**
+   * Send a payment receipt email
+   */
+  async sendPaymentReceiptEmail(
+    email: string,
+    data: PaymentReceiptData,
+  ): Promise<SendEmailResponse> {
+    const template = paymentReceiptTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  // ============================================
+  // Subscription Emails
+  // ============================================
+
+  /**
+   * Send subscription activated/upgraded email
+   */
+  async sendSubscriptionActivatedEmail(
+    email: string,
+    data: SubscriptionActivatedData,
+  ): Promise<SendEmailResponse> {
+    const template = subscriptionActivatedTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  /**
+   * Send payment success email
+   */
+  async sendPaymentSuccessEmail(
+    email: string,
+    data: PaymentSuccessData,
+  ): Promise<SendEmailResponse> {
+    const template = paymentSuccessTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  /**
+   * Send payment failed email
+   */
+  async sendPaymentFailedEmail(
+    email: string,
+    data: PaymentFailedData,
+  ): Promise<SendEmailResponse> {
+    const template = paymentFailedTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  /**
+   * Send subscription cancelled email
+   */
+  async sendSubscriptionCancelledEmail(
+    email: string,
+    data: SubscriptionCancelledData,
+  ): Promise<SendEmailResponse> {
+    const template = subscriptionCancelledTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  /**
+   * Send trial ending soon email
+   */
+  async sendTrialEndingEmail(
+    email: string,
+    data: TrialEndingData,
+  ): Promise<SendEmailResponse> {
+    const template = trialEndingTemplate(data, this.templateConfig);
+    return this.send({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
     });
   }
 }

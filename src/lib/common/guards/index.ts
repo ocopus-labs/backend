@@ -3,3 +3,4 @@ export { AuthGuard } from '@thallesp/nestjs-better-auth';
 
 // Export custom guards
 export { RolesGuard } from './roles.guard';
+export { BusinessAccessGuard } from './business-access.guard';

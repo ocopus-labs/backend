@@ -8,6 +8,7 @@ import {
   ValidateNested,
   Min,
   IsObject,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { OrderType, OrderPriority } from '../interfaces';
@@ -15,32 +16,39 @@ import type { OrderType, OrderPriority } from '../interfaces';
 class CustomerAddressDto {
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   street?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   city?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   state?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(20)
   postalCode?: string;
 }
 
 class CustomerInfoDto {
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   name?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   phone?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   email?: string;
 
   @IsOptional()
@@ -89,6 +97,7 @@ class ItemModifiersDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   specialInstructions?: string;
 }
 
@@ -97,6 +106,7 @@ class OrderItemDto {
   menuItemId: string;
 
   @IsString()
+  @MaxLength(255)
   name: string;
 
   @IsNumber()
@@ -116,6 +126,7 @@ class OrderItemDto {
 class DiscountDto {
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   code?: string;
 
   @IsEnum(['percentage', 'fixed'])
@@ -127,6 +138,7 @@ class DiscountDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   reason?: string;
 }
 
@@ -197,12 +209,14 @@ export class UpdateOrderStatusDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   reason?: string;
 }
 
 export class ApplyDiscountDto {
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   code?: string;
 
   @IsEnum(['percentage', 'fixed'])
@@ -214,6 +228,7 @@ export class ApplyDiscountDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   reason?: string;
 }
 

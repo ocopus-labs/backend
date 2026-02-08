@@ -5,7 +5,9 @@ import {
   IsNumber,
   IsBoolean,
   IsArray,
+  IsUrl,
   ValidateNested,
+  ValidateIf,
   Min,
   MaxLength,
 } from 'class-validator';
@@ -77,8 +79,9 @@ export class CreateMenuItemDto {
   @Min(0)
   price: number;
 
-  @IsString()
   @IsOptional()
+  @ValidateIf((o) => o.image && !o.image.startsWith('data:'))
+  @IsUrl({}, { message: 'image must be a valid URL' })
   image?: string;
 
   @IsString()
@@ -132,8 +135,9 @@ export class UpdateMenuItemDto {
   @Min(0)
   price?: number;
 
-  @IsString()
   @IsOptional()
+  @ValidateIf((o) => o.image && !o.image.startsWith('data:'))
+  @IsUrl({}, { message: 'image must be a valid URL' })
   image?: string;
 
   @IsString()

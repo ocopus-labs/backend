@@ -136,7 +136,7 @@ export class MenuService {
   /**
    * Create a new category
    */
-  async createCategory(businessId: string, dto: CreateCategoryDto, userId: string): Promise<MenuCategory> {
+  async createCategory(businessId: string, dto: CreateCategoryDto, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<MenuCategory> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
@@ -160,7 +160,7 @@ export class MenuService {
     categories.push(newCategory);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'CREATE', 'menu_category', { categoryId: newCategory.id, name: newCategory.name });
+    await this.createAuditLog(businessId, userId, 'CREATE', 'menu_category', { categoryId: newCategory.id, name: newCategory.name }, context);
 
     this.logger.log(`Category created: ${newCategory.name} (${newCategory.id}) for business ${businessId}`);
     return newCategory;
@@ -174,6 +174,7 @@ export class MenuService {
     categoryId: string,
     dto: UpdateCategoryDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<MenuCategory> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
@@ -198,7 +199,7 @@ export class MenuService {
     categories[categoryIndex] = updatedCategory;
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'UPDATE', 'menu_category', { categoryId, updatedFields: Object.keys(dto) });
+    await this.createAuditLog(businessId, userId, 'UPDATE', 'menu_category', { categoryId, updatedFields: Object.keys(dto) }, context);
 
     return updatedCategory;
   }
@@ -206,7 +207,7 @@ export class MenuService {
   /**
    * Delete a category
    */
-  async deleteCategory(businessId: string, categoryId: string, userId: string): Promise<void> {
+  async deleteCategory(businessId: string, categoryId: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     let categories = menuData?.categories || [];
@@ -226,7 +227,7 @@ export class MenuService {
     categories = categories.filter((c) => c.id !== categoryId);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'DELETE', 'menu_category', { categoryId });
+    await this.createAuditLog(businessId, userId, 'DELETE', 'menu_category', { categoryId }, context);
 
     this.logger.log(`Category deleted: ${categoryId} for business ${businessId}`);
   }
@@ -262,7 +263,11 @@ export class MenuService {
   /**
    * Get all items
    */
-  async getItems(businessId: string, categoryId?: string): Promise<MenuItem[]> {
+  async getItems(
+    businessId: string,
+    categoryId?: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<{ items: MenuItem[]; total: number }> {
     const menu = await this.getMenu(businessId);
     let items = menu.items;
 
@@ -270,7 +275,17 @@ export class MenuService {
       items = items.filter((i) => i.categoryId === categoryId);
     }
 
-    return items.sort((a, b) => a.sortOrder - b.sortOrder);
+    items = items.sort((a, b) => a.sortOrder - b.sortOrder);
+    const total = items.length;
+
+    if (options?.offset !== undefined) {
+      items = items.slice(options.offset);
+    }
+    if (options?.limit !== undefined) {
+      items = items.slice(0, options.limit);
+    }
+
+    return { items, total };
   }
 
   /**
@@ -290,7 +305,7 @@ export class MenuService {
   /**
    * Create a new menu item
    */
-  async createItem(businessId: string, dto: CreateMenuItemDto, userId: string): Promise<MenuItem> {
+  async createItem(businessId: string, dto: CreateMenuItemDto, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<MenuItem> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
@@ -329,7 +344,7 @@ export class MenuService {
     items.push(newItem);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'CREATE', 'menu_item', { itemId: newItem.id, name: newItem.name });
+    await this.createAuditLog(businessId, userId, 'CREATE', 'menu_item', { itemId: newItem.id, name: newItem.name }, context);
 
     this.logger.log(`Menu item created: ${newItem.name} (${newItem.id}) for business ${businessId}`);
     return newItem;
@@ -343,6 +358,7 @@ export class MenuService {
     itemId: string,
     dto: UpdateMenuItemDto,
     userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<MenuItem> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
@@ -375,7 +391,7 @@ export class MenuService {
     items[itemIndex] = updatedItem;
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'UPDATE', 'menu_item', { itemId, updatedFields: Object.keys(dto) });
+    await this.createAuditLog(businessId, userId, 'UPDATE', 'menu_item', { itemId, updatedFields: Object.keys(dto) }, context);
 
     return updatedItem;
   }
@@ -383,7 +399,7 @@ export class MenuService {
   /**
    * Delete a menu item
    */
-  async deleteItem(businessId: string, itemId: string, userId: string): Promise<void> {
+  async deleteItem(businessId: string, itemId: string, userId: string, context?: { ipAddress?: string; userAgent?: string }): Promise<void> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
@@ -397,7 +413,7 @@ export class MenuService {
     items = items.filter((i) => i.id !== itemId);
 
     await this.saveMenuData(menuRecord.id, { categories, items });
-    await this.createAuditLog(businessId, userId, 'DELETE', 'menu_item', { itemId });
+    await this.createAuditLog(businessId, userId, 'DELETE', 'menu_item', { itemId }, context);
 
     this.logger.log(`Menu item deleted: ${itemId} for business ${businessId}`);
   }
@@ -473,6 +489,7 @@ export class MenuService {
     action: string,
     resource: string,
     details: Record<string, unknown>,
+    context?: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
@@ -481,6 +498,8 @@ export class MenuService {
         action,
         resource,
         details: details as object,
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
       },
     });
   }
@@ -497,13 +516,80 @@ export class MenuService {
       return existingMenu.categories;
     }
 
-    const defaultCategories = [
-      { name: 'Appetizers', description: 'Start your meal with these delicious appetizers' },
-      { name: 'Main Course', description: 'Hearty main dishes' },
-      { name: 'Beverages', description: 'Refreshing drinks' },
-      { name: 'Desserts', description: 'Sweet treats to end your meal' },
-      { name: 'Sides', description: 'Perfect accompaniments' },
-    ];
+    // Look up business type for context-appropriate categories
+    const business = await this.prisma.restaurant.findUnique({
+      where: { id: businessId },
+      select: { type: true },
+    });
+    const businessType = (business?.type || 'restaurant').toLowerCase();
+
+    const categoryMap: Record<string, { name: string; description: string }[]> = {
+      restaurant: [
+        { name: 'Appetizers', description: 'Start your meal with these delicious appetizers' },
+        { name: 'Main Course', description: 'Hearty main dishes' },
+        { name: 'Beverages', description: 'Refreshing drinks' },
+        { name: 'Desserts', description: 'Sweet treats to end your meal' },
+        { name: 'Sides', description: 'Perfect accompaniments' },
+      ],
+      cafe: [
+        { name: 'Hot Drinks', description: 'Coffee, tea, and other hot beverages' },
+        { name: 'Cold Drinks', description: 'Iced coffees, smoothies, and cold beverages' },
+        { name: 'Pastries', description: 'Fresh baked goods and pastries' },
+        { name: 'Sandwiches', description: 'Light meals and sandwiches' },
+        { name: 'Snacks', description: 'Quick bites and light snacks' },
+      ],
+      bar: [
+        { name: 'Cocktails', description: 'Signature and classic cocktails' },
+        { name: 'Beer', description: 'Draft and bottled beers' },
+        { name: 'Wine', description: 'Red, white, and sparkling wines' },
+        { name: 'Spirits', description: 'Premium spirits and liquors' },
+        { name: 'Bar Snacks', description: 'Appetizers and bar bites' },
+      ],
+      salon: [
+        { name: 'Haircuts', description: 'Hair cutting and styling services' },
+        { name: 'Coloring', description: 'Hair coloring and highlights' },
+        { name: 'Treatments', description: 'Hair and scalp treatments' },
+        { name: 'Styling', description: 'Blowouts and special occasion styling' },
+        { name: 'Products', description: 'Retail hair care products' },
+      ],
+      gym: [
+        { name: 'Memberships', description: 'Gym membership plans' },
+        { name: 'Personal Training', description: 'One-on-one training sessions' },
+        { name: 'Group Classes', description: 'Fitness group classes' },
+        { name: 'Supplements', description: 'Nutrition and supplement products' },
+        { name: 'Merchandise', description: 'Gym apparel and accessories' },
+      ],
+      retail: [
+        { name: 'New Arrivals', description: 'Latest products and new stock' },
+        { name: 'Best Sellers', description: 'Top-selling products' },
+        { name: 'Sale', description: 'Discounted items on sale' },
+        { name: 'Accessories', description: 'Add-on accessories and extras' },
+        { name: 'Gift Cards', description: 'Gift cards and vouchers' },
+      ],
+      clinic: [
+        { name: 'Consultations', description: 'Medical consultations and check-ups' },
+        { name: 'Treatments', description: 'Medical treatments and procedures' },
+        { name: 'Lab Tests', description: 'Diagnostic and laboratory tests' },
+        { name: 'Medications', description: 'Prescribed medications' },
+        { name: 'Wellness', description: 'Preventive care and wellness packages' },
+      ],
+      hotel: [
+        { name: 'Room Service', description: 'In-room dining menu' },
+        { name: 'Breakfast', description: 'Morning breakfast options' },
+        { name: 'Lunch & Dinner', description: 'Main dining courses' },
+        { name: 'Beverages', description: 'Drinks and refreshments' },
+        { name: 'Mini Bar', description: 'In-room mini bar selections' },
+      ],
+      spa: [
+        { name: 'Massages', description: 'Massage therapy services' },
+        { name: 'Facials', description: 'Facial treatments and skincare' },
+        { name: 'Body Treatments', description: 'Body wraps, scrubs, and treatments' },
+        { name: 'Packages', description: 'Spa day packages and combos' },
+        { name: 'Products', description: 'Skincare and wellness products' },
+      ],
+    };
+
+    const defaultCategories = categoryMap[businessType] || categoryMap['restaurant'];
 
     const createdCategories: MenuCategory[] = [];
 
@@ -516,7 +602,7 @@ export class MenuService {
       createdCategories.push(category);
     }
 
-    this.logger.log(`Seeded ${createdCategories.length} default categories for business ${businessId}`);
+    this.logger.log(`Seeded ${createdCategories.length} ${businessType} categories for business ${businessId}`);
     return createdCategories;
   }
 }

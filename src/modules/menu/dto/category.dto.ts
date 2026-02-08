@@ -4,6 +4,8 @@ import {
   IsOptional,
   IsNumber,
   IsBoolean,
+  IsUrl,
+  ValidateIf,
   MaxLength,
 } from 'class-validator';
 
@@ -18,8 +20,9 @@ export class CreateCategoryDto {
   @MaxLength(200)
   description?: string;
 
-  @IsString()
   @IsOptional()
+  @ValidateIf((o) => o.image && !o.image.startsWith('data:'))
+  @IsUrl({}, { message: 'image must be a valid URL' })
   image?: string;
 
   @IsNumber()
@@ -42,8 +45,9 @@ export class UpdateCategoryDto {
   @MaxLength(200)
   description?: string;
 
-  @IsString()
   @IsOptional()
+  @ValidateIf((o) => o.image && !o.image.startsWith('data:'))
+  @IsUrl({}, { message: 'image must be a valid URL' })
   image?: string;
 
   @IsNumber()

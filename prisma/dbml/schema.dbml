@@ -13,7 +13,6 @@ Table restaurants {
   contact Json [not null]
   ownerId String [not null]
   businessInfo Json [not null]
-  subscription Json [not null]
   settings Json [not null]
   status String [not null, default: 'active']
   stats Json
@@ -29,7 +28,10 @@ Table restaurants {
   orders orders [not null]
   payments payments [not null]
   owner users [not null]
+  refunds refunds [not null]
+  stockTransactions stock_transactions [not null]
   tables tables [not null]
+  usageRecords usage_records [not null]
 }
 
 Table users {
@@ -40,6 +42,9 @@ Table users {
   image String
   role String
   banned Boolean
+  banReason String
+  twoFactorEnabled Boolean [default: false]
+  preferences Json
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   accounts account [not null]
@@ -51,6 +56,10 @@ Table users {
   payments payments [not null]
   ownedRestaurants restaurants [not null]
   sessions session [not null]
+  subscriptions subscriptions [not null]
+  twoFactorEntries two_factor [not null]
+  announcements announcements [not null]
+  announcementDismissals announcement_dismissals [not null]
 }
 
 Table business_users {
@@ -103,10 +112,28 @@ Table inventory_items {
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   restaurant restaurants [not null]
+  stockTransactions stock_transactions [not null]
 
   indexes {
     (restaurantId, sku) [unique]
   }
+}
+
+Table stock_transactions {
+  id String [pk]
+  inventoryItemId String [not null]
+  restaurantId String [not null]
+  type String [not null]
+  quantity Decimal [not null]
+  previousStock Decimal [not null]
+  newStock Decimal [not null]
+  reason String
+  reference String
+  performedBy String [not null]
+  performedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
+  inventoryItem inventory_items [not null]
+  restaurant restaurants [not null]
 }
 
 Table orders {
@@ -131,6 +158,7 @@ Table orders {
   feedback Json
   timestamps Json [not null]
   auditTrail Json[] [not null]
+  deletedAt DateTime
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   restaurant restaurants [not null]
@@ -160,10 +188,26 @@ Table payments {
   processedBy String
   processedAt DateTime
   settlementInfo Json
+  deletedAt DateTime
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
   order orders [not null]
   processor users
+  restaurant restaurants [not null]
+  refundRecords refunds [not null]
+}
+
+Table refunds {
+  id String [pk]
+  paymentId String [not null]
+  restaurantId String [not null]
+  amount Decimal [not null]
+  reason String [not null]
+  method String [not null]
+  refundedBy String [not null]
+  refundedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
+  payment payments [not null]
   restaurant restaurants [not null]
 }
 
@@ -286,6 +330,14 @@ Table session {
   user users [not null]
 }
 
+Table two_factor {
+  id String [pk]
+  secret String [not null]
+  backupCodes String [not null]
+  userId String [not null]
+  user users [not null]
+}
+
 Table account {
   id String [pk]
   accountId String [not null]
@@ -310,6 +362,121 @@ Table verification {
   expiresAt DateTime [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [default: `now()`, not null]
+}
+
+Table subscription_plans {
+  id String [pk]
+  name String [unique, not null]
+  slug String [unique, not null]
+  displayName String [not null]
+  description String
+  priceMonthly Decimal [not null, default: 0]
+  priceYearly Decimal
+  currency String [not null, default: 'INR']
+  dodoProductId String [unique]
+  maxLocations Int [not null]
+  maxTeamMembers Int [not null]
+  maxOrdersPerMonth Int [not null]
+  features Json [not null]
+  isPublic Boolean [not null, default: true]
+  sortOrder Int [not null, default: 0]
+  status String [not null, default: 'active']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  subscriptions subscriptions [not null]
+}
+
+Table subscriptions {
+  id String [pk]
+  userId String [not null]
+  planId String [not null]
+  status String [not null, default: 'active']
+  currentPeriodStart DateTime [not null]
+  currentPeriodEnd DateTime [not null]
+  cancelAtPeriodEnd Boolean [not null, default: false]
+  canceledAt DateTime
+  trialStart DateTime
+  trialEnd DateTime
+  dodoSubscriptionId String [unique]
+  dodoCustomerId String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  plan subscription_plans [not null]
+  usageRecords usage_records [not null]
+}
+
+Table usage_records {
+  id String [pk]
+  subscriptionId String [not null]
+  restaurantId String [not null]
+  periodStart DateTime [not null]
+  periodEnd DateTime [not null]
+  ordersCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  subscription subscriptions [not null]
+  restaurant restaurants [not null]
+
+  indexes {
+    (subscriptionId, restaurantId, periodStart) [unique]
+  }
+}
+
+Table webhook_events {
+  id String [pk]
+  provider String [not null, default: 'dodo']
+  eventType String [not null]
+  eventId String [unique, not null]
+  payload Json [not null]
+  status String [not null, default: 'pending']
+  processedAt DateTime
+  errorMessage String
+  retryCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table announcements {
+  id String [pk]
+  title String [not null]
+  content String [not null]
+  type String [not null, default: 'info']
+  target String [not null, default: 'all']
+  targetMeta Json
+  isActive Boolean [not null, default: true]
+  isPinned Boolean [not null, default: false]
+  publishAt DateTime
+  expiresAt DateTime
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  creator users [not null]
+  dismissals announcement_dismissals [not null]
+}
+
+Table announcement_dismissals {
+  id String [pk]
+  announcementId String [not null]
+  userId String [not null]
+  dismissedAt DateTime [default: `now()`, not null]
+  announcement announcements [not null]
+  user users [not null]
+
+  indexes {
+    (announcementId, userId) [unique]
+  }
+}
+
+Table impersonation_sessions {
+  id String [pk]
+  adminUserId String [not null]
+  targetUserId String [not null]
+  adminSessionId String [unique, not null]
+  impSessionId String [unique, not null]
+  createdAt DateTime [default: `now()`, not null]
+  expiresAt DateTime [not null]
 }
 
 Enum UserRole {
@@ -396,9 +563,13 @@ Ref: menu_items.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: inventory_items.restaurantId > restaurants.id [delete: Cascade]
 
+Ref: stock_transactions.inventoryItemId > inventory_items.id [delete: Cascade]
+
+Ref: stock_transactions.restaurantId > restaurants.id [delete: Cascade]
+
 Ref: orders.restaurantId > restaurants.id [delete: Cascade]
 
-Ref: orders.staffId > users.id
+Ref: orders.staffId > users.id [delete: Restrict]
 
 Ref: orders.tableId > tables.id
 
@@ -407,6 +578,10 @@ Ref: payments.orderId > orders.id [delete: Cascade]
 Ref: payments.processedBy > users.id
 
 Ref: payments.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: refunds.paymentId > payments.id [delete: Cascade]
+
+Ref: refunds.restaurantId > restaurants.id [delete: Cascade]
 
 Ref: tables.restaurantId > restaurants.id [delete: Cascade]
 
@@ -428,4 +603,20 @@ Ref: audit_logs.userId > users.id
 
 Ref: session.userId > users.id [delete: Cascade]
 
+Ref: two_factor.userId > users.id [delete: Cascade]
+
 Ref: account.userId > users.id [delete: Cascade]
+
+Ref: subscriptions.userId > users.id [delete: Cascade]
+
+Ref: subscriptions.planId > subscription_plans.id
+
+Ref: usage_records.subscriptionId > subscriptions.id [delete: Cascade]
+
+Ref: usage_records.restaurantId > restaurants.id [delete: Cascade]
+
+Ref: announcements.createdBy > users.id
+
+Ref: announcement_dismissals.announcementId > announcements.id [delete: Cascade]
+
+Ref: announcement_dismissals.userId > users.id [delete: Cascade]

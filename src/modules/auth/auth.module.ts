@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
     PrismaModule,
     MailModule,
     NestJSBetterAuthModule.forRootAsync({
+      isGlobal: true,
       imports: [PrismaModule, MailModule],
       useFactory: (prisma: PrismaService, mailService: MailService) => ({
         auth: createAuthConfig(prisma, mailService),
