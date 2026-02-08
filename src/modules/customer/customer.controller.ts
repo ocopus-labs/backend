@@ -18,7 +18,7 @@ import { Response } from 'express';
 import { Session } from '@thallesp/nestjs-better-auth';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto';
-import { BusinessRoles, generateCsv } from 'src/lib/common';
+import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 
 interface UserSession {
@@ -32,6 +32,7 @@ interface UserSession {
 
 @Controller('business/:businessId/customers')
 @UsePipes(new ValidationPipe({ transform: true }))
+@Sanitize()
 export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 

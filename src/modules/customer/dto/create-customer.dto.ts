@@ -63,4 +63,9 @@ export class CreateCustomerDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  taxId?: string;
 }

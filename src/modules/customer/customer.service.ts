@@ -40,6 +40,7 @@ export class CustomerService {
           address: dto.address ? (dto.address as object) : undefined,
           notes: dto.notes,
           tags: dto.tags || [],
+          taxId: dto.taxId,
           createdBy: userId,
         },
       });
@@ -200,6 +201,7 @@ export class CustomerService {
           ...(dto.address !== undefined && { address: dto.address as object }),
           ...(dto.notes !== undefined && { notes: dto.notes }),
           ...(dto.tags !== undefined && { tags: dto.tags }),
+          ...(dto.taxId !== undefined && { taxId: dto.taxId }),
           ...(dto.status !== undefined && { status: dto.status }),
         },
       });
