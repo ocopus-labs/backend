@@ -30,6 +30,13 @@ export class MenuService {
   private async processImage(imageData?: string): Promise<string | undefined> {
     if (!imageData) return undefined;
 
+    // Reject blob URLs - they are browser-only and cannot be processed server-side
+    if (imageData.startsWith('blob:')) {
+      throw new BadRequestException(
+        'Blob URLs are not supported. Please upload the image as base64 data.',
+      );
+    }
+
     // If it's a base64 data URL, upload to Cloudinary
     if (imageData.startsWith('data:')) {
       try {

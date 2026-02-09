@@ -273,6 +273,13 @@ export class BusinessService {
 
     let logoUrl = imageData;
 
+    // Reject blob URLs - they are browser-only and cannot be processed server-side
+    if (imageData.startsWith('blob:')) {
+      throw new BadRequestException(
+        'Blob URLs are not supported. Please upload the image as base64 data.',
+      );
+    }
+
     // If it's base64 data, upload to Cloudinary
     if (imageData.startsWith('data:')) {
       const uploadResult = await this.cloudinaryService.uploadImage(
