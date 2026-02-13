@@ -106,7 +106,7 @@ export const createAuthConfig = (
         },
         otpLength: 6,
         expiresIn: 300, // 5 minutes
-        overrideDefaultEmailVerification: false,
+        overrideDefaultEmailVerification: true,
       }),
 
       // Admin Plugin with custom roles

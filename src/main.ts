@@ -29,6 +29,10 @@ async function bootstrap() {
   // Apply JSON body parser for MCP endpoint
   app.use('/api/mcp', bodyParser.json());
 
+  // General JSON body parser for all other API routes (5MB limit for base64 image uploads)
+  app.use('/api', bodyParser.json({ limit: '5mb' }));
+  app.use('/api', bodyParser.urlencoded({ extended: true, limit: '5mb' }));
+
   // Parse cookies for impersonation and other cookie-based features
   app.use(cookieParser());
 
