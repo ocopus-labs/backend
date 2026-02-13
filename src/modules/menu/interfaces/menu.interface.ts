@@ -46,16 +46,40 @@ export interface MenuCategory {
   updatedAt: string;
 }
 
+export interface ModifierGroupOption {
+  id: string;
+  name: string;
+  price: number;
+  isDefault?: boolean;
+  sortOrder: number;
+}
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  required: boolean;
+  multiSelect: boolean;
+  minSelections?: number;
+  maxSelections?: number;
+  options: ModifierGroupOption[];
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MenuData {
   categories: MenuCategory[];
   items: MenuItem[];
+  modifierGroups: ModifierGroup[];
 }
 
 export interface MenuResponse {
   categories: MenuCategory[];
   items: MenuItem[];
+  modifierGroups: ModifierGroup[];
   totalCategories: number;
   totalItems: number;
+  totalModifierGroups: number;
   menuVersion: number;
   lastPublished?: string;
 }

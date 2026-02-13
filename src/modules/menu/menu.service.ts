@@ -12,8 +12,17 @@ import {
   UpdateMenuItemDto,
   CreateCategoryDto,
   UpdateCategoryDto,
+  CreateModifierGroupDto,
+  UpdateModifierGroupDto,
 } from './dto';
-import { MenuItem, MenuCategory, MenuData, MenuResponse } from './interfaces';
+import {
+  MenuItem,
+  MenuCategory,
+  MenuData,
+  MenuResponse,
+  ModifierGroup,
+  ModifierGroupOption,
+} from './interfaces';
 
 @Injectable()
 export class MenuService {
@@ -67,8 +76,10 @@ export class MenuService {
       return {
         categories: [],
         items: [],
+        modifierGroups: [],
         totalCategories: 0,
         totalItems: 0,
+        totalModifierGroups: 0,
         menuVersion: 1.0,
         lastPublished: undefined,
       };
@@ -77,12 +88,15 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     return {
       categories,
       items,
+      modifierGroups,
       totalCategories: categories.length,
       totalItems: items.length,
+      totalModifierGroups: modifierGroups.length,
       menuVersion: Number(menuRecord.menuVersion),
       lastPublished: menuRecord.lastPublished?.toISOString(),
     };
@@ -100,7 +114,7 @@ export class MenuService {
       menuRecord = await this.prisma.menuItem.create({
         data: {
           restaurantId: businessId,
-          categories: { categories: [], items: [] },
+          categories: { categories: [], items: [], modifierGroups: [] },
           menuVersion: 1.0,
         },
       });
@@ -164,6 +178,7 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     // Process image (upload to Cloudinary if base64)
     const imageUrl = await this.processImage(dto.image);
@@ -182,7 +197,7 @@ export class MenuService {
 
     categories.push(newCategory);
 
-    await this.saveMenuData(menuRecord.id, { categories, items });
+    await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
     await this.createAuditLog(
       businessId,
       userId,
@@ -212,6 +227,7 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     const categoryIndex = categories.findIndex((c) => c.id === categoryId);
     if (categoryIndex === -1) {
@@ -233,7 +249,7 @@ export class MenuService {
 
     categories[categoryIndex] = updatedCategory;
 
-    await this.saveMenuData(menuRecord.id, { categories, items });
+    await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
     await this.createAuditLog(
       businessId,
       userId,
@@ -257,8 +273,9 @@ export class MenuService {
   ): Promise<void> {
     const menuRecord = await this.getOrCreateMenuRecord(businessId);
     const menuData = menuRecord.categories as unknown as MenuData;
-    let categories = menuData?.categories || [];
+    const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     const categoryIndex = categories.findIndex((c) => c.id === categoryId);
     if (categoryIndex === -1) {
@@ -273,9 +290,9 @@ export class MenuService {
       );
     }
 
-    categories = categories.filter((c) => c.id !== categoryId);
+    const filteredCategories = categories.filter((c) => c.id !== categoryId);
 
-    await this.saveMenuData(menuRecord.id, { categories, items });
+    await this.saveMenuData(menuRecord.id, { categories: filteredCategories, items, modifierGroups });
     await this.createAuditLog(
       businessId,
       userId,
@@ -302,6 +319,7 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     // Reorder based on provided IDs
     const reorderedCategories = categoryIds
@@ -321,6 +339,7 @@ export class MenuService {
     await this.saveMenuData(menuRecord.id, {
       categories: reorderedCategories,
       items,
+      modifierGroups,
     });
     await this.createAuditLog(
       businessId,
@@ -390,6 +409,7 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     // Validate category exists
     const categoryExists = categories.some((c) => c.id === dto.categoryId);
@@ -425,7 +445,7 @@ export class MenuService {
 
     items.push(newItem);
 
-    await this.saveMenuData(menuRecord.id, { categories, items });
+    await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
     await this.createAuditLog(
       businessId,
       userId,
@@ -455,6 +475,7 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     const itemIndex = items.findIndex((i) => i.id === itemId);
     if (itemIndex === -1) {
@@ -486,7 +507,7 @@ export class MenuService {
 
     items[itemIndex] = updatedItem;
 
-    await this.saveMenuData(menuRecord.id, { categories, items });
+    await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
     await this.createAuditLog(
       businessId,
       userId,
@@ -512,6 +533,7 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     let items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     const itemIndex = items.findIndex((i) => i.id === itemId);
     if (itemIndex === -1) {
@@ -520,7 +542,7 @@ export class MenuService {
 
     items = items.filter((i) => i.id !== itemId);
 
-    await this.saveMenuData(menuRecord.id, { categories, items });
+    await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
     await this.createAuditLog(
       businessId,
       userId,
@@ -563,6 +585,7 @@ export class MenuService {
     const menuData = menuRecord.categories as unknown as MenuData;
     const categories = menuData?.categories || [];
     const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
 
     const updatedItems: MenuItem[] = [];
     const now = new Date().toISOString();
@@ -575,13 +598,205 @@ export class MenuService {
       }
     }
 
-    await this.saveMenuData(menuRecord.id, { categories, items });
+    await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
     await this.createAuditLog(businessId, userId, 'BULK_UPDATE', 'menu_items', {
       itemIds,
       isAvailable,
     });
 
     return updatedItems;
+  }
+
+  // ==================== MODIFIER GROUP OPERATIONS ====================
+
+  /**
+   * Get all modifier groups
+   */
+  async getModifierGroups(businessId: string): Promise<ModifierGroup[]> {
+    const menu = await this.getMenu(businessId);
+    return menu.modifierGroups;
+  }
+
+  /**
+   * Get modifier group by ID
+   */
+  async getModifierGroupById(
+    businessId: string,
+    groupId: string,
+  ): Promise<ModifierGroup> {
+    const menu = await this.getMenu(businessId);
+    const group = menu.modifierGroups.find((g) => g.id === groupId);
+
+    if (!group) {
+      throw new NotFoundException(
+        `Modifier group with ID ${groupId} not found`,
+      );
+    }
+
+    return group;
+  }
+
+  /**
+   * Create a new modifier group
+   */
+  async createModifierGroup(
+    businessId: string,
+    dto: CreateModifierGroupDto,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<ModifierGroup> {
+    const menuRecord = await this.getOrCreateMenuRecord(businessId);
+    const menuData = menuRecord.categories as unknown as MenuData;
+    const categories = menuData?.categories || [];
+    const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
+
+    const now = new Date().toISOString();
+
+    const options: ModifierGroupOption[] = dto.options.map((opt, index) => ({
+      id: uuidv4(),
+      name: opt.name,
+      price: opt.price,
+      isDefault: opt.isDefault,
+      sortOrder: opt.sortOrder ?? index + 1,
+    }));
+
+    const newGroup: ModifierGroup = {
+      id: uuidv4(),
+      name: dto.name,
+      required: dto.required ?? false,
+      multiSelect: dto.multiSelect ?? false,
+      minSelections: dto.minSelections,
+      maxSelections: dto.maxSelections,
+      options,
+      sortOrder: dto.sortOrder ?? modifierGroups.length + 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    modifierGroups.push(newGroup);
+
+    await this.saveMenuData(menuRecord.id, {
+      categories,
+      items,
+      modifierGroups,
+    });
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'CREATE',
+      'modifier_group',
+      { groupId: newGroup.id, name: newGroup.name },
+      context,
+    );
+
+    this.logger.log(
+      `Modifier group created: ${newGroup.name} (${newGroup.id}) for business ${businessId}`,
+    );
+    return newGroup;
+  }
+
+  /**
+   * Update a modifier group
+   */
+  async updateModifierGroup(
+    businessId: string,
+    groupId: string,
+    dto: UpdateModifierGroupDto,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<ModifierGroup> {
+    const menuRecord = await this.getOrCreateMenuRecord(businessId);
+    const menuData = menuRecord.categories as unknown as MenuData;
+    const categories = menuData?.categories || [];
+    const items = menuData?.items || [];
+    const modifierGroups = menuData?.modifierGroups || [];
+
+    const groupIndex = modifierGroups.findIndex((g) => g.id === groupId);
+    if (groupIndex === -1) {
+      throw new NotFoundException(
+        `Modifier group with ID ${groupId} not found`,
+      );
+    }
+
+    let options = modifierGroups[groupIndex].options;
+    if (dto.options) {
+      options = dto.options.map((opt, index) => ({
+        id: uuidv4(),
+        name: opt.name,
+        price: opt.price,
+        isDefault: opt.isDefault,
+        sortOrder: opt.sortOrder ?? index + 1,
+      }));
+    }
+
+    const updatedGroup: ModifierGroup = {
+      ...modifierGroups[groupIndex],
+      ...dto,
+      options,
+      updatedAt: new Date().toISOString(),
+    };
+
+    modifierGroups[groupIndex] = updatedGroup;
+
+    await this.saveMenuData(menuRecord.id, {
+      categories,
+      items,
+      modifierGroups,
+    });
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'UPDATE',
+      'modifier_group',
+      { groupId, updatedFields: Object.keys(dto) },
+      context,
+    );
+
+    return updatedGroup;
+  }
+
+  /**
+   * Delete a modifier group
+   */
+  async deleteModifierGroup(
+    businessId: string,
+    groupId: string,
+    userId: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    const menuRecord = await this.getOrCreateMenuRecord(businessId);
+    const menuData = menuRecord.categories as unknown as MenuData;
+    const categories = menuData?.categories || [];
+    const items = menuData?.items || [];
+    let modifierGroups = menuData?.modifierGroups || [];
+
+    const groupIndex = modifierGroups.findIndex((g) => g.id === groupId);
+    if (groupIndex === -1) {
+      throw new NotFoundException(
+        `Modifier group with ID ${groupId} not found`,
+      );
+    }
+
+    modifierGroups = modifierGroups.filter((g) => g.id !== groupId);
+
+    await this.saveMenuData(menuRecord.id, {
+      categories,
+      items,
+      modifierGroups,
+    });
+    await this.createAuditLog(
+      businessId,
+      userId,
+      'DELETE',
+      'modifier_group',
+      { groupId },
+      context,
+    );
+
+    this.logger.log(
+      `Modifier group deleted: ${groupId} for business ${businessId}`,
+    );
   }
 
   /**

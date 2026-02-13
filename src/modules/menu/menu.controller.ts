@@ -22,6 +22,8 @@ import {
   CreateCategoryDto,
   UpdateCategoryDto,
   ReorderCategoriesDto,
+  CreateModifierGroupDto,
+  UpdateModifierGroupDto,
 } from './dto';
 import { BusinessRoles, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
@@ -207,6 +209,117 @@ export class MenuController {
     return {
       message: 'Categories reordered successfully',
       categories,
+    };
+  }
+
+  // ==================== MODIFIER GROUPS ====================
+
+  @Get('modifier-groups')
+  async getModifierGroups(
+    @Param('businessId') businessId: string,
+    @Session() session: UserSession,
+  ) {
+    const modifierGroups =
+      await this.menuService.getModifierGroups(businessId);
+    return { modifierGroups };
+  }
+
+  @Get('modifier-groups/:groupId')
+  async getModifierGroupById(
+    @Param('businessId') businessId: string,
+    @Param('groupId') groupId: string,
+    @Session() session: UserSession,
+  ) {
+    const modifierGroup = await this.menuService.getModifierGroupById(
+      businessId,
+      groupId,
+    );
+    return { modifierGroup };
+  }
+
+  @Post('modifier-groups')
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
+  async createModifierGroup(
+    @Param('businessId') businessId: string,
+    @Body() dto: CreateModifierGroupDto,
+    @Session() session: UserSession,
+    @Req() req: any,
+  ) {
+    const modifierGroup = await this.menuService.createModifierGroup(
+      businessId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
+    return {
+      message: 'Modifier group created successfully',
+      modifierGroup,
+    };
+  }
+
+  @Patch('modifier-groups/:groupId')
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
+  async updateModifierGroup(
+    @Param('businessId') businessId: string,
+    @Param('groupId') groupId: string,
+    @Body() dto: UpdateModifierGroupDto,
+    @Session() session: UserSession,
+    @Req() req: any,
+  ) {
+    const modifierGroup = await this.menuService.updateModifierGroup(
+      businessId,
+      groupId,
+      dto,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
+    return {
+      message: 'Modifier group updated successfully',
+      modifierGroup,
+    };
+  }
+
+  @Delete('modifier-groups/:groupId')
+  @HttpCode(HttpStatus.OK)
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+  )
+  async deleteModifierGroup(
+    @Param('businessId') businessId: string,
+    @Param('groupId') groupId: string,
+    @Session() session: UserSession,
+    @Req() req: any,
+  ) {
+    await this.menuService.deleteModifierGroup(
+      businessId,
+      groupId,
+      session.user.id,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    );
+    return {
+      message: 'Modifier group deleted successfully',
     };
   }
 

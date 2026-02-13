@@ -9,3 +9,8 @@ export {
   UpdateCategoryDto,
   ReorderCategoriesDto,
 } from './category.dto';
+export {
+  ModifierGroupOptionDto,
+  CreateModifierGroupDto,
+  UpdateModifierGroupDto,
+} from './modifier-group.dto';
