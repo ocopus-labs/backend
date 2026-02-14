@@ -103,6 +103,27 @@ export class BusinessService {
         },
       });
 
+      // Seed default expense categories
+      const defaultCategories = [
+        { name: 'Rent & Lease', color: '#ef4444', description: 'Rent, lease payments, and property costs' },
+        { name: 'Utilities', color: '#f97316', description: 'Electricity, water, gas, internet, phone' },
+        { name: 'Supplies', color: '#22c55e', description: 'Office and operational supplies' },
+        { name: 'Salaries & Wages', color: '#6366f1', description: 'Employee salaries, wages, and benefits' },
+        { name: 'Food & Ingredients', color: '#eab308', description: 'Raw materials and ingredients' },
+        { name: 'Maintenance', color: '#06b6d4', description: 'Equipment repair and maintenance' },
+        { name: 'Marketing', color: '#a855f7', description: 'Advertising, promotions, and marketing' },
+        { name: 'Transport', color: '#64748b', description: 'Delivery, fuel, and transportation costs' },
+        { name: 'Taxes & Licenses', color: '#ec4899', description: 'Government taxes, permits, and licenses' },
+        { name: 'Miscellaneous', color: '#14b8a6', description: 'Other uncategorized expenses' },
+      ];
+
+      await tx.expenseCategory.createMany({
+        data: defaultCategories.map((cat) => ({
+          restaurantId: biz.id,
+          ...cat,
+        })),
+      });
+
       return biz;
     });
 
