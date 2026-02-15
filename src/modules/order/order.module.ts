@@ -8,6 +8,8 @@ import { SubscriptionModule } from 'src/modules/subscription/subscription.module
 import { TableModule } from 'src/modules/table/table.module';
 import { LoyaltyModule } from 'src/modules/loyalty/loyalty.module';
 import { TaxModule } from 'src/modules/tax/tax.module';
+import { InventoryModule } from 'src/modules/inventory/inventory.module';
+import { MenuModule } from 'src/modules/menu/menu.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { TaxModule } from 'src/modules/tax/tax.module';
     TableModule,
     LoyaltyModule,
     TaxModule,
+    InventoryModule,
+    MenuModule,
   ],
   controllers: [OrderController],
   providers: [OrderService, OrderGateway],

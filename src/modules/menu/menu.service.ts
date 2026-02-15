@@ -14,6 +14,7 @@ import {
   UpdateCategoryDto,
   CreateModifierGroupDto,
   UpdateModifierGroupDto,
+  MenuItemIngredientDto,
 } from './dto';
 import {
   MenuItem,
@@ -22,7 +23,10 @@ import {
   MenuResponse,
   ModifierGroup,
   ModifierGroupOption,
+  MenuItemIngredient,
 } from './interfaces';
+import { InventoryService } from '../inventory/inventory.service';
+import type { LinkedMenuItem } from '../inventory/interfaces';
 
 @Injectable()
 export class MenuService {
@@ -31,6 +35,7 @@ export class MenuService {
   constructor(
     private prisma: PrismaService,
     private cloudinaryService: CloudinaryService,
+    private inventoryService: InventoryService,
   ) {}
 
   /**
@@ -62,6 +67,106 @@ export class MenuService {
 
     // If it's already a URL, return as-is
     return imageData;
+  }
+
+  /**
+   * Resolve ingredient DTOs into full MenuItemIngredient objects
+   */
+  private async resolveIngredients(
+    businessId: string,
+    ingredientDtos: MenuItemIngredientDto[],
+  ): Promise<{ ingredients: MenuItemIngredient[]; foodCost: number }> {
+    const ingredients: MenuItemIngredient[] = [];
+    let foodCost = 0;
+
+    for (const dto of ingredientDtos) {
+      const invItem = await this.inventoryService.findByIdOrFail(
+        businessId,
+        dto.inventoryItemId,
+      );
+
+      if (!invItem.isActive) {
+        throw new BadRequestException(
+          `Inventory item "${invItem.name}" is inactive and cannot be linked`,
+        );
+      }
+
+      const costPerUnit = Number(invItem.costPerUnit);
+      ingredients.push({
+        inventoryItemId: invItem.id,
+        inventoryItemName: invItem.name,
+        quantityUsed: dto.quantityUsed,
+        unit: dto.unit,
+        costPerUnit,
+      });
+
+      foodCost += dto.quantityUsed * costPerUnit;
+    }
+
+    return { ingredients, foodCost: Math.round(foodCost * 100) / 100 };
+  }
+
+  /**
+   * Sync the linkedMenuItems reverse-index on inventory items
+   */
+  private async syncLinkedMenuItems(
+    businessId: string,
+    menuItemId: string,
+    menuItemName: string,
+    newIngredients: MenuItemIngredient[],
+    oldIngredients: MenuItemIngredient[],
+  ): Promise<void> {
+    const oldIds = new Set(oldIngredients.map((i) => i.inventoryItemId));
+    const newIds = new Set(newIngredients.map((i) => i.inventoryItemId));
+
+    // Remove from inventory items no longer linked
+    const removedIds = [...oldIds].filter((id) => !newIds.has(id));
+    for (const invId of removedIds) {
+      try {
+        const invItem = await this.prisma.inventoryItem.findFirst({
+          where: { id: invId, restaurantId: businessId },
+        });
+        if (!invItem) continue;
+
+        const linked = (invItem.linkedMenuItems || []) as unknown as LinkedMenuItem[];
+        const filtered = linked.filter((l) => l.menuItemId !== menuItemId);
+        await this.prisma.inventoryItem.update({
+          where: { id: invId },
+          data: { linkedMenuItems: filtered as object[] },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Failed to remove linkedMenuItem from inventory ${invId}: ${err}`,
+        );
+      }
+    }
+
+    // Add/update on currently linked inventory items
+    for (const ingredient of newIngredients) {
+      try {
+        const invItem = await this.prisma.inventoryItem.findFirst({
+          where: { id: ingredient.inventoryItemId, restaurantId: businessId },
+        });
+        if (!invItem) continue;
+
+        const linked = (invItem.linkedMenuItems || []) as unknown as LinkedMenuItem[];
+        const filtered = linked.filter((l) => l.menuItemId !== menuItemId);
+        filtered.push({
+          menuItemId,
+          itemName: menuItemName,
+          quantityUsed: ingredient.quantityUsed,
+          unit: ingredient.unit,
+        });
+        await this.prisma.inventoryItem.update({
+          where: { id: ingredient.inventoryItemId },
+          data: { linkedMenuItems: filtered as object[] },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Failed to update linkedMenuItem on inventory ${ingredient.inventoryItemId}: ${err}`,
+        );
+      }
+    }
   }
 
   /**
@@ -422,6 +527,15 @@ export class MenuService {
     // Process image (upload to Cloudinary if base64)
     const imageUrl = await this.processImage(dto.image);
 
+    // Resolve ingredients if provided
+    let resolvedIngredients: MenuItemIngredient[] | undefined;
+    let foodCost: number | undefined;
+    if (dto.ingredients?.length) {
+      const resolved = await this.resolveIngredients(businessId, dto.ingredients);
+      resolvedIngredients = resolved.ingredients;
+      foodCost = resolved.foodCost;
+    }
+
     const now = new Date().toISOString();
     const categoryItems = items.filter((i) => i.categoryId === dto.categoryId);
 
@@ -439,6 +553,8 @@ export class MenuService {
       preparationTime: dto.preparationTime,
       sortOrder: dto.sortOrder ?? categoryItems.length + 1,
       modifiers: dto.modifiers,
+      ingredients: resolvedIngredients,
+      foodCost,
       createdAt: now,
       updatedAt: now,
     };
@@ -446,6 +562,18 @@ export class MenuService {
     items.push(newItem);
 
     await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
+
+    // Sync reverse-index on inventory items
+    if (resolvedIngredients?.length) {
+      await this.syncLinkedMenuItems(
+        businessId,
+        newItem.id,
+        newItem.name,
+        resolvedIngredients,
+        [],
+      );
+    }
+
     await this.createAuditLog(
       businessId,
       userId,
@@ -498,16 +626,46 @@ export class MenuService {
         ? await this.processImage(dto.image)
         : items[itemIndex].image;
 
+    // Resolve ingredients if provided
+    const oldIngredients = items[itemIndex].ingredients || [];
+    let resolvedIngredients: MenuItemIngredient[] | undefined;
+    let foodCost: number | undefined;
+    if (dto.ingredients !== undefined) {
+      if (dto.ingredients.length > 0) {
+        const resolved = await this.resolveIngredients(businessId, dto.ingredients);
+        resolvedIngredients = resolved.ingredients;
+        foodCost = resolved.foodCost;
+      } else {
+        // Explicitly clearing ingredients
+        resolvedIngredients = [];
+        foodCost = 0;
+      }
+    }
+
     const updatedItem: MenuItem = {
       ...items[itemIndex],
       ...dto,
       image: imageUrl,
+      ...(resolvedIngredients !== undefined && { ingredients: resolvedIngredients }),
+      ...(foodCost !== undefined && { foodCost }),
       updatedAt: new Date().toISOString(),
     };
 
     items[itemIndex] = updatedItem;
 
     await this.saveMenuData(menuRecord.id, { categories, items, modifierGroups });
+
+    // Sync reverse-index on inventory items if ingredients changed
+    if (resolvedIngredients !== undefined) {
+      await this.syncLinkedMenuItems(
+        businessId,
+        itemId,
+        updatedItem.name,
+        resolvedIngredients,
+        oldIngredients,
+      );
+    }
+
     await this.createAuditLog(
       businessId,
       userId,
@@ -538,6 +696,19 @@ export class MenuService {
     const itemIndex = items.findIndex((i) => i.id === itemId);
     if (itemIndex === -1) {
       throw new NotFoundException(`Menu item with ID ${itemId} not found`);
+    }
+
+    const deletedItem = items[itemIndex];
+
+    // Clean up reverse-index on inventory items
+    if (deletedItem.ingredients?.length) {
+      await this.syncLinkedMenuItems(
+        businessId,
+        itemId,
+        deletedItem.name,
+        [],
+        deletedItem.ingredients,
+      );
     }
 
     items = items.filter((i) => i.id !== itemId);

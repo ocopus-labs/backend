@@ -3,6 +3,7 @@ export {
   UpdateMenuItemDto,
   MenuItemModifierDto,
   MenuItemModifiersDto,
+  MenuItemIngredientDto,
 } from './menu-item.dto';
 export {
   CreateCategoryDto,

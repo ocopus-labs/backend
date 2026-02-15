@@ -28,6 +28,9 @@ import { LoyaltyService } from 'src/modules/loyalty/loyalty.service';
 import { TaxService } from 'src/modules/tax/tax.service';
 import { calculateTaxForOrder } from 'src/modules/tax/utils/tax-calculator';
 import type { TaxBreakdown } from 'src/modules/tax/interfaces';
+import { InventoryService } from 'src/modules/inventory/inventory.service';
+import { MenuService } from 'src/modules/menu/menu.service';
+import type { MenuItemIngredient } from 'src/modules/menu/interfaces';
 
 @Injectable()
 export class OrderService {
@@ -40,6 +43,8 @@ export class OrderService {
     private readonly tableService: TableService,
     private readonly loyaltyService: LoyaltyService,
     private readonly taxService: TaxService,
+    private readonly inventoryService: InventoryService,
+    private readonly menuService: MenuService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -505,6 +510,50 @@ export class OrderService {
         );
       } catch (err) {
         this.logger.warn(`Failed to award loyalty points: ${err}`);
+      }
+    }
+
+    // Deduct inventory when order is completed
+    if (dto.status === 'completed') {
+      try {
+        const menu = await this.menuService.getMenu(businessId);
+        const orderItems = existing.items as unknown as OrderItem[];
+        const deductions: {
+          inventoryItemId: string;
+          quantity: number;
+          unit: string;
+        }[] = [];
+
+        for (const orderItem of orderItems) {
+          if (orderItem.status === 'cancelled') continue;
+          const menuItem = menu.items.find(
+            (mi) => mi.id === orderItem.menuItemId,
+          );
+          if (!menuItem?.ingredients?.length) continue;
+
+          for (const ingredient of menuItem.ingredients as MenuItemIngredient[]) {
+            deductions.push({
+              inventoryItemId: ingredient.inventoryItemId,
+              quantity: ingredient.quantityUsed * orderItem.quantity,
+              unit: ingredient.unit,
+            });
+          }
+        }
+
+        if (deductions.length > 0) {
+          await this.inventoryService.deductForOrder(
+            businessId,
+            orderId,
+            existing.orderNumber,
+            deductions,
+            staffId,
+            'System',
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to deduct inventory for order ${existing.orderNumber}: ${err}`,
+        );
       }
     }
 

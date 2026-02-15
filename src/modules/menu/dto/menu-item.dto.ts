@@ -64,6 +64,20 @@ export class MenuItemModifiersDto {
   removals?: string[];
 }
 
+export class MenuItemIngredientDto {
+  @IsString()
+  @IsNotEmpty()
+  inventoryItemId: string;
+
+  @IsNumber()
+  @Min(0.001)
+  quantityUsed: number;
+
+  @IsString()
+  @IsNotEmpty()
+  unit: string;
+}
+
 export class CreateMenuItemDto {
   @IsString()
   @IsNotEmpty()
@@ -132,6 +146,12 @@ export class CreateMenuItemDto {
   @IsOptional()
   @Min(0)
   customTaxRate?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MenuItemIngredientDto)
+  @IsOptional()
+  ingredients?: MenuItemIngredientDto[];
 }
 
 export class UpdateMenuItemDto {
@@ -203,4 +223,10 @@ export class UpdateMenuItemDto {
   @IsOptional()
   @Min(0)
   customTaxRate?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MenuItemIngredientDto)
+  @IsOptional()
+  ingredients?: MenuItemIngredientDto[];
 }

@@ -460,6 +460,57 @@ export class InventoryService {
     return { transactions, total };
   }
 
+  async deductForOrder(
+    restaurantId: string,
+    orderId: string,
+    orderNumber: string,
+    items: {
+      inventoryItemId: string;
+      quantity: number;
+      unit: string;
+    }[],
+    userId: string,
+    userName: string,
+  ): Promise<void> {
+    // Aggregate total deduction per inventory item
+    const aggregated = new Map<
+      string,
+      { totalQuantity: number; unit: string }
+    >();
+    for (const item of items) {
+      const existing = aggregated.get(item.inventoryItemId);
+      if (existing) {
+        existing.totalQuantity += item.quantity;
+      } else {
+        aggregated.set(item.inventoryItemId, {
+          totalQuantity: item.quantity,
+          unit: item.unit,
+        });
+      }
+    }
+
+    for (const [inventoryItemId, { totalQuantity }] of aggregated) {
+      try {
+        await this.processStockTransaction(
+          restaurantId,
+          inventoryItemId,
+          {
+            type: 'remove',
+            quantity: totalQuantity,
+            reference: orderId,
+            reason: `Auto-deduct for order ${orderNumber}`,
+          },
+          userId,
+          userName,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Failed to deduct inventory ${inventoryItemId} for order ${orderNumber}: ${err}`,
+        );
+      }
+    }
+  }
+
   private calculateStatus(
     currentStock: number,
     minimumStock: number,
