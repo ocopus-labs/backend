@@ -173,7 +173,9 @@ export class BusinessService {
       orderBy: { joinedAt: 'desc' },
     });
 
-    const directBusinesses = businessUsers.map((bu) => bu.restaurant);
+    const directBusinesses = businessUsers
+      .map((bu) => bu.restaurant)
+      .filter((b) => b.status !== 'deleted');
     const directIds = new Set(directBusinesses.map((b) => b.id));
 
     // Get businesses from franchise membership
