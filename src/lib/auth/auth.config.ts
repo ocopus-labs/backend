@@ -161,6 +161,10 @@ export const createAuthConfig = (
     // Advanced features
     advanced: {
       useSecureCookies: process.env.NODE_ENV === 'production',
+      crossSubDomainCookies: {
+        enabled: !!process.env.COOKIE_DOMAIN,
+        domain: process.env.COOKIE_DOMAIN,
+      },
     },
 
     // Session configuration
