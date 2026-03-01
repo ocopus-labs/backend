@@ -47,7 +47,6 @@ export class MenuController {
   // ==================== MENU ====================
 
   @Get()
-  @HttpCacheTTL(30)
   async getMenu(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -82,7 +81,6 @@ export class MenuController {
   // ==================== CATEGORIES ====================
 
   @Get('categories')
-  @HttpCacheTTL(30)
   async getCategories(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -330,7 +328,6 @@ export class MenuController {
   // ==================== ITEMS ====================
 
   @Get('items')
-  @HttpCacheTTL(30)
   async getItems(
     @Param('businessId') businessId: string,
     @Query('categoryId') categoryId: string | undefined,
