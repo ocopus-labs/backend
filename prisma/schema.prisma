@@ -22,6 +22,7 @@ model Restaurant {
   contact           Json
   ownerId           String             @map("owner_id")
   businessInfo      Json               @map("business_info")
+  subscription      Json?
   settings          Json
   status            String             @default("active")
   stats             Json?
