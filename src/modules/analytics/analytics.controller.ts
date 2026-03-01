@@ -43,6 +43,7 @@ export class AnalyticsController {
   }
 
   @Get('sales')
+  @HttpCacheTTL(60)
   async getSalesSummary(
     @Param('businessId') businessId: string,
     @Query('period') period: ReportPeriod | undefined,
@@ -65,6 +66,7 @@ export class AnalyticsController {
   }
 
   @Get('payments')
+  @HttpCacheTTL(60)
   async getPaymentBreakdown(
     @Param('businessId') businessId: string,
     @Query('period') period: ReportPeriod | undefined,
@@ -87,6 +89,7 @@ export class AnalyticsController {
   }
 
   @Get('top-items')
+  @HttpCacheTTL(120)
   async getTopItems(
     @Param('businessId') businessId: string,
     @Query('period') period: ReportPeriod | undefined,
@@ -111,6 +114,7 @@ export class AnalyticsController {
   }
 
   @Get('hourly')
+  @HttpCacheTTL(30)
   async getHourlyBreakdown(
     @Param('businessId') businessId: string,
     @Query('date') dateStr: string | undefined,
@@ -126,6 +130,7 @@ export class AnalyticsController {
   }
 
   @Get('staff')
+  @HttpCacheTTL(120)
   @BusinessRoles(
     USER_ROLES.RESTAURANT_OWNER,
     USER_ROLES.FRANCHISE_OWNER,
@@ -153,6 +158,7 @@ export class AnalyticsController {
   }
 
   @Get('report')
+  @HttpCacheTTL(120)
   @BusinessRoles(
     USER_ROLES.RESTAURANT_OWNER,
     USER_ROLES.FRANCHISE_OWNER,

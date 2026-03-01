@@ -108,6 +108,7 @@ export class MenuService {
 
   /**
    * Sync the linkedMenuItems reverse-index on inventory items
+   * Batch-fetches all affected items, processes in memory, batch-updates in a transaction
    */
   private async syncLinkedMenuItems(
     businessId: string,
@@ -119,36 +120,34 @@ export class MenuService {
     const oldIds = new Set(oldIngredients.map((i) => i.inventoryItemId));
     const newIds = new Set(newIngredients.map((i) => i.inventoryItemId));
 
-    // Remove from inventory items no longer linked
-    const removedIds = [...oldIds].filter((id) => !newIds.has(id));
-    for (const invId of removedIds) {
-      try {
-        const invItem = await this.prisma.inventoryItem.findFirst({
-          where: { id: invId, restaurantId: businessId },
-        });
-        if (!invItem) continue;
+    // Single query: fetch ALL affected inventory items at once
+    const allAffectedIds = [...new Set([...oldIds, ...newIds])];
+    if (allAffectedIds.length === 0) return;
 
+    try {
+      const inventoryItems = await this.prisma.inventoryItem.findMany({
+        where: { id: { in: allAffectedIds }, restaurantId: businessId },
+      });
+      const itemMap = new Map(inventoryItems.map((i) => [i.id, i]));
+
+      // Process updates in memory
+      const updates: { id: string; linkedMenuItems: object[] }[] = [];
+
+      // Handle removed ingredients
+      for (const invId of [...oldIds].filter((id) => !newIds.has(id))) {
+        const invItem = itemMap.get(invId);
+        if (!invItem) continue;
         const linked = (invItem.linkedMenuItems || []) as unknown as LinkedMenuItem[];
-        const filtered = linked.filter((l) => l.menuItemId !== menuItemId);
-        await this.prisma.inventoryItem.update({
-          where: { id: invId },
-          data: { linkedMenuItems: filtered as object[] },
+        updates.push({
+          id: invId,
+          linkedMenuItems: linked.filter((l) => l.menuItemId !== menuItemId) as object[],
         });
-      } catch (err) {
-        this.logger.warn(
-          `Failed to remove linkedMenuItem from inventory ${invId}: ${err}`,
-        );
       }
-    }
 
-    // Add/update on currently linked inventory items
-    for (const ingredient of newIngredients) {
-      try {
-        const invItem = await this.prisma.inventoryItem.findFirst({
-          where: { id: ingredient.inventoryItemId, restaurantId: businessId },
-        });
+      // Handle added/updated ingredients
+      for (const ingredient of newIngredients) {
+        const invItem = itemMap.get(ingredient.inventoryItemId);
         if (!invItem) continue;
-
         const linked = (invItem.linkedMenuItems || []) as unknown as LinkedMenuItem[];
         const filtered = linked.filter((l) => l.menuItemId !== menuItemId);
         filtered.push({
@@ -157,15 +156,27 @@ export class MenuService {
           quantityUsed: ingredient.quantityUsed,
           unit: ingredient.unit,
         });
-        await this.prisma.inventoryItem.update({
-          where: { id: ingredient.inventoryItemId },
-          data: { linkedMenuItems: filtered as object[] },
+        updates.push({
+          id: ingredient.inventoryItemId,
+          linkedMenuItems: filtered as object[],
         });
-      } catch (err) {
-        this.logger.warn(
-          `Failed to update linkedMenuItem on inventory ${ingredient.inventoryItemId}: ${err}`,
+      }
+
+      // Single transaction for all updates
+      if (updates.length > 0) {
+        await this.prisma.$transaction(
+          updates.map((u) =>
+            this.prisma.inventoryItem.update({
+              where: { id: u.id },
+              data: { linkedMenuItems: u.linkedMenuItems },
+            }),
+          ),
         );
       }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to sync linkedMenuItems for menu item ${menuItemId}: ${err}`,
+      );
     }
   }
 

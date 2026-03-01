@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import {
   CreateOrderDto,
@@ -952,52 +953,32 @@ export class OrderService {
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
 
-    const [orders, completedOrders, cancelledOrders] = await Promise.all([
-      this.prisma.order.findMany({
-        where: {
-          restaurantId: businessId,
-          deletedAt: null,
-          createdAt: { gte: startOfDay, lt: endOfDay },
-        },
-        select: {
-          status: true,
-          pricing: true,
-          paymentStatus: true,
-        },
-      }),
-      this.prisma.order.count({
-        where: {
-          restaurantId: businessId,
-          status: 'completed',
-          deletedAt: null,
-          createdAt: { gte: startOfDay, lt: endOfDay },
-        },
-      }),
-      this.prisma.order.count({
-        where: {
-          restaurantId: businessId,
-          status: 'cancelled',
-          deletedAt: null,
-          createdAt: { gte: startOfDay, lt: endOfDay },
-        },
-      }),
-    ]);
+    const result = await this.prisma.$queryRaw<
+      [{ total: bigint; completed_paid: bigint; completed: bigint; cancelled: bigint; active: bigint; total_revenue: Prisma.Decimal }]
+    >`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'completed' AND payment_status = 'paid') as completed_paid,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+        COUNT(*) FILTER (WHERE status = 'active') as active,
+        COALESCE(SUM((pricing->>'total')::numeric) FILTER (WHERE status = 'completed' AND payment_status = 'paid'), 0) as total_revenue
+      FROM orders
+      WHERE restaurant_id = ${businessId}
+        AND deleted_at IS NULL
+        AND created_at >= ${startOfDay} AND created_at < ${endOfDay}
+    `;
 
-    const totalRevenue = orders
-      .filter((o) => o.status === 'completed' && o.paymentStatus === 'paid')
-      .reduce((sum, o) => {
-        const pricing = o.pricing as unknown as OrderPricing;
-        return sum + pricing.total;
-      }, 0);
-
-    const activeOrders = orders.filter((o) => o.status === 'active').length;
+    const row = result[0];
+    const totalRevenue = Number(row?.total_revenue ?? 0);
+    const completedOrders = Number(row?.completed ?? 0);
 
     return {
       stats: {
-        totalOrders: orders.length,
-        activeOrders,
+        totalOrders: Number(row?.total ?? 0),
+        activeOrders: Number(row?.active ?? 0),
         completedOrders,
-        cancelledOrders,
+        cancelledOrders: Number(row?.cancelled ?? 0),
         totalRevenue,
         averageOrderValue:
           completedOrders > 0 ? totalRevenue / completedOrders : 0,
@@ -1014,50 +995,40 @@ export class OrderService {
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        restaurantId: businessId,
-        status: 'completed',
-        deletedAt: null,
-        createdAt: { gte: startDate },
-      },
-      select: {
-        items: true,
-      },
-    });
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        category: string;
+        quantity_sold: Prisma.Decimal;
+        revenue: Prisma.Decimal;
+      }>
+    >`
+      SELECT
+        COALESCE(item->>'menuItemId', item->>'id', 'unknown') as id,
+        COALESCE(item->>'name', 'Unknown') as name,
+        COALESCE(item->>'category', 'Menu Item') as category,
+        SUM(COALESCE((item->>'quantity')::int, 1)) as quantity_sold,
+        SUM(COALESCE((item->>'totalPrice')::numeric, 0)) as revenue
+      FROM orders, jsonb_array_elements(items) as item
+      WHERE restaurant_id = ${businessId}
+        AND status = 'completed'
+        AND deleted_at IS NULL
+        AND created_at >= ${startDate}
+      GROUP BY item->>'menuItemId', item->>'id', item->>'name', item->>'category'
+      ORDER BY quantity_sold DESC
+      LIMIT ${limit}
+    `;
 
-    // Aggregate items sold
-    const itemStats = new Map<
-      string,
-      { name: string; category: string; quantitySold: number; revenue: number }
-    >();
-
-    for (const order of orders) {
-      const items = order.items as unknown as OrderItem[];
-      for (const item of items) {
-        const key = item.menuItemId;
-        const existing = itemStats.get(key);
-        if (existing) {
-          existing.quantitySold += item.quantity;
-          existing.revenue += item.totalPrice;
-        } else {
-          itemStats.set(key, {
-            name: item.name,
-            category: 'Menu Item', // Default category, could be enhanced with menu lookup
-            quantitySold: item.quantity,
-            revenue: item.totalPrice,
-          });
-        }
-      }
-    }
-
-    // Sort by quantity sold and take top items
-    const sortedItems = Array.from(itemStats.entries())
-      .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => b.quantitySold - a.quantitySold)
-      .slice(0, limit);
-
-    return { items: sortedItems };
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        quantitySold: Number(row.quantity_sold),
+        revenue: Number(row.revenue),
+      })),
+    };
   }
 
   async getPeakHours(businessId: string, days: number = 7) {
@@ -1065,54 +1036,37 @@ export class OrderService {
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        restaurantId: businessId,
-        status: 'completed',
-        deletedAt: null,
-        createdAt: { gte: startDate },
-      },
-      select: {
-        createdAt: true,
-        pricing: true,
-      },
-    });
+    const rows = await this.prisma.$queryRaw<
+      Array<{ hour_value: number; order_count: bigint; revenue: Prisma.Decimal }>
+    >`
+      SELECT
+        EXTRACT(HOUR FROM created_at)::int as hour_value,
+        COUNT(*) as order_count,
+        COALESCE(SUM((pricing->>'total')::numeric), 0) as revenue
+      FROM orders
+      WHERE restaurant_id = ${businessId}
+        AND status = 'completed'
+        AND deleted_at IS NULL
+        AND created_at >= ${startDate}
+      GROUP BY EXTRACT(HOUR FROM created_at)
+      ORDER BY order_count DESC
+      LIMIT 6
+    `;
 
-    // Aggregate by hour
-    const hourlyStats = new Map<
-      number,
-      { orderCount: number; revenue: number }
-    >();
-
-    for (const order of orders) {
-      const hour = order.createdAt.getHours();
-      const pricing = order.pricing as unknown as OrderPricing;
-      const existing = hourlyStats.get(hour);
-      if (existing) {
-        existing.orderCount += 1;
-        existing.revenue += pricing.total;
-      } else {
-        hourlyStats.set(hour, { orderCount: 1, revenue: pricing.total });
-      }
-    }
-
-    // Format hours and sort by order count
     const formatHour = (hour: number): string => {
       const period = hour >= 12 ? 'PM' : 'AM';
       const displayHour = hour % 12 || 12;
       return `${displayHour}:00 ${period}`;
     };
 
-    const peakHours = Array.from(hourlyStats.entries())
-      .map(([hour, data]) => ({
-        hour: formatHour(hour),
-        hourValue: hour,
-        ...data,
-      }))
-      .sort((a, b) => b.orderCount - a.orderCount)
-      .slice(0, 6);
-
-    return { hours: peakHours };
+    return {
+      hours: rows.map((row) => ({
+        hour: formatHour(row.hour_value),
+        hourValue: row.hour_value,
+        orderCount: Number(row.order_count),
+        revenue: Number(row.revenue),
+      })),
+    };
   }
 
   async getRevenueTrends(businessId: string, days: number = 30) {
@@ -1120,42 +1074,30 @@ export class OrderService {
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        restaurantId: businessId,
-        status: 'completed',
-        paymentStatus: 'paid',
-        deletedAt: null,
-        createdAt: { gte: startDate },
-      },
-      select: {
-        createdAt: true,
-        pricing: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const rows = await this.prisma.$queryRaw<
+      Array<{ date: string; revenue: Prisma.Decimal; orders: bigint }>
+    >`
+      SELECT
+        DATE(created_at)::text as date,
+        COALESCE(SUM((pricing->>'total')::numeric), 0) as revenue,
+        COUNT(*) as orders
+      FROM orders
+      WHERE restaurant_id = ${businessId}
+        AND status = 'completed'
+        AND payment_status = 'paid'
+        AND deleted_at IS NULL
+        AND created_at >= ${startDate}
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `;
 
-    // Aggregate by date
-    const dailyStats = new Map<string, { revenue: number; orders: number }>();
-
-    for (const order of orders) {
-      const dateKey = order.createdAt.toISOString().split('T')[0];
-      const pricing = order.pricing as unknown as OrderPricing;
-      const existing = dailyStats.get(dateKey);
-      if (existing) {
-        existing.revenue += pricing.total;
-        existing.orders += 1;
-      } else {
-        dailyStats.set(dateKey, { revenue: pricing.total, orders: 1 });
-      }
-    }
-
-    const trends = Array.from(dailyStats.entries()).map(([date, data]) => ({
-      date,
-      ...data,
-    }));
-
-    return { trends };
+    return {
+      trends: rows.map((row) => ({
+        date: row.date,
+        revenue: Number(row.revenue),
+        orders: Number(row.orders),
+      })),
+    };
   }
 
   async softDelete(

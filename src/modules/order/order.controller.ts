@@ -24,7 +24,7 @@ import {
   UpdateItemQuantityDto,
   ApplyDiscountDto,
 } from './dto';
-import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
+import { BusinessRoles, generateCsv, HttpCacheTTL, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 
 interface UserSession {
@@ -96,6 +96,7 @@ export class OrderController {
   }
 
   @Get('stats')
+  @HttpCacheTTL(15)
   async getOrderStats(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -108,6 +109,7 @@ export class OrderController {
   }
 
   @Get('analytics/top-items')
+  @HttpCacheTTL(300)
   async getTopSellingItems(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -122,6 +124,7 @@ export class OrderController {
   }
 
   @Get('analytics/peak-hours')
+  @HttpCacheTTL(300)
   async getPeakHours(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -134,6 +137,7 @@ export class OrderController {
   }
 
   @Get('analytics/revenue-trends')
+  @HttpCacheTTL(300)
   async getRevenueTrends(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,

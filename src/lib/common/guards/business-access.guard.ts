@@ -3,8 +3,11 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { BUSINESS_ROLES_KEY } from '../decorators/business-roles.decorator';
 import { PERMISSION_KEY } from '../decorators/require-permission.decorator';
@@ -15,6 +18,7 @@ export class BusinessAccessGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,7 +35,25 @@ export class BusinessAccessGuard implements CanActivate {
       return true; // Let the auth guard handle unauthenticated users
     }
 
-    // Check if user is a member of the business
+    // 1. Check if already resolved on this request (per-request cache)
+    if (request.businessUser) {
+      return this.checkRolesAndPermissions(context, request);
+    }
+
+    // 2. Check cross-request cache (60s TTL)
+    const cacheKey = `biz-access:${user.id}:${businessId}`;
+    const cached = await this.cacheManager.get<{
+      role: string;
+      permissions: string[];
+      franchiseAccess?: boolean;
+    }>(cacheKey);
+
+    if (cached) {
+      request.businessUser = cached;
+      return this.checkRolesAndPermissions(context, request);
+    }
+
+    // 3. DB lookup
     const businessUser = await this.prisma.businessUser.findFirst({
       where: {
         userId: user.id,
@@ -68,8 +90,6 @@ export class BusinessAccessGuard implements CanActivate {
             permissions: franchiseUser.permissions,
             franchiseAccess: true,
           };
-
-          // Continue to role/permission checks below
         } else {
           throw new ForbiddenException(
             'You do not have access to this business',
@@ -79,13 +99,22 @@ export class BusinessAccessGuard implements CanActivate {
         throw new ForbiddenException('You do not have access to this business');
       }
     } else {
-      // Attach business user info to request for downstream use
       request.businessUser = {
         role: businessUser.role,
         permissions: businessUser.permissions,
       };
     }
 
+    // 4. Cache result for 60s
+    await this.cacheManager.set(cacheKey, request.businessUser, 60_000);
+
+    return this.checkRolesAndPermissions(context, request);
+  }
+
+  private checkRolesAndPermissions(
+    context: ExecutionContext,
+    request: any,
+  ): boolean {
     const effectiveRole = request.businessUser.role;
 
     // Check business-specific role requirements

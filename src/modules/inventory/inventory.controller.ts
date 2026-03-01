@@ -24,7 +24,7 @@ import {
   UpdateInventoryItemDto,
   StockTransactionDto,
 } from './dto';
-import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
+import { BusinessRoles, generateCsv, HttpCacheTTL, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { InventoryStatus } from './interfaces';
 
@@ -74,6 +74,7 @@ export class InventoryController {
   }
 
   @Get()
+  @HttpCacheTTL(30)
   async findAll(
     @Param('businessId') businessId: string,
     @Query('category') category: string | undefined,
@@ -150,6 +151,7 @@ export class InventoryController {
   }
 
   @Get('stats')
+  @HttpCacheTTL(30)
   async getStats(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -159,6 +161,7 @@ export class InventoryController {
   }
 
   @Get('low-stock')
+  @HttpCacheTTL(60)
   async getLowStock(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -168,6 +171,7 @@ export class InventoryController {
   }
 
   @Get('expiring')
+  @HttpCacheTTL(60)
   async getExpiring(
     @Param('businessId') businessId: string,
     @Query('days') days: string | undefined,

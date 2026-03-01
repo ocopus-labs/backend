@@ -25,7 +25,7 @@ import {
   EndTableSessionDto,
   AddMaintenanceLogDto,
 } from './dto';
-import { BusinessRoles } from 'src/lib/common';
+import { BusinessRoles, HttpCacheTTL } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { TableStatus } from './interfaces';
 
@@ -70,6 +70,7 @@ export class TableController {
   }
 
   @Get()
+  @HttpCacheTTL(10)
   async findAll(
     @Param('businessId') businessId: string,
     @Query('status') status: TableStatus | undefined,
@@ -85,6 +86,7 @@ export class TableController {
   }
 
   @Get('stats')
+  @HttpCacheTTL(15)
   async getStats(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,

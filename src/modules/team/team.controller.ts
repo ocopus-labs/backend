@@ -26,7 +26,7 @@ import {
   UpdateMemberPermissionsDto,
   SuspendMemberDto,
 } from './dto';
-import { BusinessRoles, generateCsv, Sanitize } from 'src/lib/common';
+import { BusinessRoles, generateCsv, HttpCacheTTL, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 import { TeamMemberStatus } from './interfaces';
 
@@ -48,6 +48,7 @@ export class TeamController {
   constructor(private teamService: TeamService) {}
 
   @Get()
+  @HttpCacheTTL(60)
   async findAll(
     @Param('businessId') businessId: string,
     @Query('status') status: TeamMemberStatus | undefined,
@@ -108,6 +109,7 @@ export class TeamController {
   }
 
   @Get('stats')
+  @HttpCacheTTL(30)
   @BusinessRoles(
     USER_ROLES.RESTAURANT_OWNER,
     USER_ROLES.FRANCHISE_OWNER,
@@ -122,6 +124,7 @@ export class TeamController {
   }
 
   @Get('roles')
+  @HttpCacheTTL(600)
   async getRoles(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -131,6 +134,7 @@ export class TeamController {
   }
 
   @Get('permissions')
+  @HttpCacheTTL(300)
   @BusinessRoles(USER_ROLES.RESTAURANT_OWNER, USER_ROLES.MANAGER)
   async getPermissionTree(
     @Param('businessId') businessId: string,

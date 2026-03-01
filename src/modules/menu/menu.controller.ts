@@ -25,7 +25,7 @@ import {
   CreateModifierGroupDto,
   UpdateModifierGroupDto,
 } from './dto';
-import { BusinessRoles, Sanitize } from 'src/lib/common';
+import { BusinessRoles, HttpCacheTTL, Sanitize } from 'src/lib/common';
 import { USER_ROLES } from 'src/lib/auth/roles.constants';
 
 interface UserSession {
@@ -47,6 +47,7 @@ export class MenuController {
   // ==================== MENU ====================
 
   @Get()
+  @HttpCacheTTL(30)
   async getMenu(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -81,6 +82,7 @@ export class MenuController {
   // ==================== CATEGORIES ====================
 
   @Get('categories')
+  @HttpCacheTTL(30)
   async getCategories(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -90,6 +92,7 @@ export class MenuController {
   }
 
   @Get('categories/:categoryId')
+  @HttpCacheTTL(60)
   async getCategoryById(
     @Param('businessId') businessId: string,
     @Param('categoryId') categoryId: string,
@@ -215,6 +218,7 @@ export class MenuController {
   // ==================== MODIFIER GROUPS ====================
 
   @Get('modifier-groups')
+  @HttpCacheTTL(60)
   async getModifierGroups(
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
@@ -326,6 +330,7 @@ export class MenuController {
   // ==================== ITEMS ====================
 
   @Get('items')
+  @HttpCacheTTL(30)
   async getItems(
     @Param('businessId') businessId: string,
     @Query('categoryId') categoryId: string | undefined,

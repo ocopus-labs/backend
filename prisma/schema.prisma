@@ -300,6 +300,9 @@ model Order {
   @@index([paymentStatus])
   @@index([createdAt(sort: Desc)])
   @@index([deletedAt])
+  @@index([restaurantId, status, createdAt(sort: Desc)])
+  @@index([restaurantId, paymentStatus, createdAt(sort: Desc)])
+  @@index([restaurantId, status, paymentStatus])
   @@map("orders")
 }
 
@@ -466,6 +469,8 @@ model Expense {
   @@index([status])
   @@index([createdBy])
   @@index([expenseDate(sort: Desc)])
+  @@index([restaurantId, status, expenseDate(sort: Desc)])
+  @@index([restaurantId, categoryId, expenseDate(sort: Desc)])
   @@map("expenses")
 }
 
