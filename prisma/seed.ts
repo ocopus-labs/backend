@@ -995,7 +995,7 @@ async function seedMenuItems() {
 async function main() {
   try {
     await seedSuperAdmin();
-    // await seedSubscriptionPlans();
+    await seedSubscriptionPlans();
     await seedMenuItems();
   } catch (error) {
     console.error('❌ Error seeding:', error);
