@@ -22,9 +22,9 @@ class AddressDto {
   street?: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
-  city: string;
+  city?: string;
 
   @IsString()
   @IsOptional()

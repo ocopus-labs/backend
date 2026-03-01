@@ -39,18 +39,28 @@ export class BusinessService {
 
     const slug = await this.generateSlug(dto.name);
 
+    // Upload logo to Cloudinary if it's base64 data
+    let logoUrl = dto.logo;
+    if (logoUrl?.startsWith('data:')) {
+      const uploadResult = await this.cloudinaryService.uploadImage(
+        logoUrl,
+        'business-logos',
+      );
+      logoUrl = uploadResult.url;
+    }
+
     const business = await this.prisma.$transaction(async (tx) => {
       const biz = await tx.restaurant.create({
         data: {
           name: dto.name,
           slug,
           type: dto.type,
-          logo: dto.logo,
+          logo: logoUrl,
           description: dto.description,
           ownerId,
           address: {
             street: dto.address.street,
-            city: dto.address.city,
+            city: dto.address.city || '',
             state: dto.address.state || '',
             country: dto.address.country,
             postalCode: dto.address.postalCode || '',
@@ -213,13 +223,23 @@ export class BusinessService {
     if (dto.name) updateData.name = dto.name;
     if (dto.type) updateData.type = dto.type;
     if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.logo) updateData.logo = dto.logo;
+    if (dto.logo) {
+      if (dto.logo.startsWith('data:')) {
+        const uploadResult = await this.cloudinaryService.uploadImage(
+          dto.logo,
+          'business-logos',
+        );
+        updateData.logo = uploadResult.url;
+      } else {
+        updateData.logo = dto.logo;
+      }
+    }
     if (dto.status) updateData.status = dto.status;
 
     if (dto.address) {
       updateData.address = {
         street: dto.address.street,
-        city: dto.address.city,
+        city: dto.address.city || '',
         state: dto.address.state || '',
         country: dto.address.country,
         postalCode: dto.address.postalCode || '',
