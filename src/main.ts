@@ -17,6 +17,12 @@ async function bootstrap() {
     bodyParser: false,
   });
 
+  // Enable CORS BEFORE any route handlers so all responses get CORS headers
+  app.enableCors({
+    origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(','),
+    credentials: true,
+  });
+
   // Mount Better Auth handler directly at Express level
   // NestJS middleware forRoutes('/api/auth') doesn't match sub-paths in path-to-regexp v8+
   const betterAuthService = app.get(BetterAuthService);
@@ -54,12 +60,6 @@ async function bootstrap() {
   // Set global API prefix (exclude Better Auth routes and webhook routes)
   app.setGlobalPrefix('api', {
     exclude: ['webhook/dodo'],
-  });
-
-  // Enable CORS for frontend
-  app.enableCors({
-    origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(','),
-    credentials: true,
   });
 
   const port = process.env.PORT ?? 3000;
