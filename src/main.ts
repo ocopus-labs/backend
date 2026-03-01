@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import * as bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
+import { toNodeHandler } from 'better-auth/node';
+import { AuthService as BetterAuthService } from '@thallesp/nestjs-better-auth';
 
 dotenv.config();
 
@@ -14,6 +16,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
   });
+
+  // Mount Better Auth handler directly at Express level
+  // NestJS middleware forRoutes('/api/auth') doesn't match sub-paths in path-to-regexp v8+
+  const betterAuthService = app.get(BetterAuthService);
+  const authHandler = toNodeHandler(betterAuthService.instance as any);
+  app.use('/api/auth', authHandler);
 
   // Apply raw body capture for webhook routes BEFORE any other middleware
   // This must be done first to capture the raw body for signature verification

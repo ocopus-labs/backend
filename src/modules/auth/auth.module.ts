@@ -17,6 +17,8 @@ import { PrismaService } from '../prisma/prisma.service';
       imports: [PrismaModule, MailModule],
       useFactory: (prisma: PrismaService, mailService: MailService) => ({
         auth: createAuthConfig(prisma, mailService),
+        disableBodyParser: true,
+        disableTrustedOriginsCors: true,
       }),
       inject: [PrismaService, MailService],
     }),
