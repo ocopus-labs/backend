@@ -169,8 +169,8 @@ export const createAuthConfig = (
 
     // Session configuration
     session: {
-      expiresIn: 60 * 60 * 12, // 12 hours
-      updateAge: 60 * 60 * 1, // Update every 1 hour
+      expiresIn: 60 * 60 * 24 * 7, // 7 days
+      updateAge: 60 * 60 * 24, // Update every 1 day
     },
 
     // Account linking
