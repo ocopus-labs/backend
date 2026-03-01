@@ -91,7 +91,9 @@ export class ApiKeyService {
         scopes: true,
         permissions: true,
         rateLimit: true,
+        lastUsedAt: true,
         expiresAt: true,
+        isActive: true,
         createdAt: true,
       },
     });
