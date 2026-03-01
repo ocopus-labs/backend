@@ -113,6 +113,38 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
         };
       },
     );
+
+    server.tool(
+      'update-menu-item',
+      'Update a menu item (name, price, description, image, dietary flags, etc.)',
+      {
+        itemId: z.string().describe('The menu item ID'),
+        name: z.string().optional().describe('New item name'),
+        price: z.number().min(0).optional().describe('New price'),
+        description: z.string().optional().describe('New description'),
+        image: z.string().url().optional().describe('New image URL'),
+        isAvailable: z.boolean().optional().describe('Whether the item is available'),
+        isVegetarian: z.boolean().optional().describe('Whether the item is vegetarian'),
+        isVegan: z.boolean().optional().describe('Whether the item is vegan'),
+        isGlutenFree: z.boolean().optional().describe('Whether the item is gluten-free'),
+        preparationTime: z
+          .number()
+          .optional()
+          .describe('Preparation time in minutes'),
+      },
+      async ({ itemId, ...updates }) => {
+        const result = await ctx.menuService.updateItem(
+          ctx.businessId,
+          itemId,
+          updates as any,
+          ctx.userId,
+        );
+        await ctx.audit('menu.update_item', 'menu', itemId, updates);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
   }
 
   if (ctx.hasPermission('catalog:create')) {
