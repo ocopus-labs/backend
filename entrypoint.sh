@@ -18,7 +18,7 @@ echo "Migrations applied successfully."
 
 if [ "$RUN_SEED" = "true" ]; then
   echo "Seeding database..."
-  npm run seed
+  node dist/prisma/seed.js
 fi
 
 echo "Starting server..."

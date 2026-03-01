@@ -17,7 +17,7 @@ WORKDIR /usr/src/app
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=deps /usr/src/app/package*.json ./
 COPY --from=deps /usr/src/app/prisma ./prisma/
-COPY tsconfig*.json nest-cli.json ./
+COPY tsconfig*.json nest-cli.json prisma.config.ts ./
 COPY src ./src/
 
 RUN npx nest build && \
@@ -36,6 +36,12 @@ COPY --from=builder --chown=node:node /usr/src/app/dist          ./dist
 COPY --from=builder --chown=node:node /usr/src/app/node_modules  ./node_modules
 COPY --from=builder --chown=node:node /usr/src/app/package*.json ./
 COPY --from=deps    --chown=node:node /usr/src/app/prisma        ./prisma/
+COPY --chown=node:node prisma.config.ts ./
+
+# Prisma CLI is needed for migrations at startup but is a devDependency
+# removed by prune. Re-install it (also downloads platform engine binaries).
+RUN npm install prisma --no-save
+
 COPY --chown=node:node entrypoint.sh ./
 
 RUN chmod +x entrypoint.sh
