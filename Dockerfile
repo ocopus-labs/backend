@@ -22,9 +22,8 @@ COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY src ./src/
 
-RUN npm rebuild
-RUN npm run build
-RUN npm prune --production
+RUN npx nest build
+RUN npm prune --omit=dev --ignore-scripts
 
 # Stage 3: Production runtime
 FROM node:20-alpine
