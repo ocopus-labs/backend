@@ -1,15 +1,36 @@
-version: '3.8'
-
+# Local development only. For Coolify, deploy the Dockerfile directly
+# and create PostgreSQL as a separate Coolify database resource.
 services:
+  db:
+    image: postgres:18-alpine
+    container_name: pos_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
-
-    image: nestjs-prod-app
-    container_name: nestjs_app_prod
-
+    container_name: pos_app
     restart: unless-stopped
-
+    env_file: .env
     ports:
       - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
