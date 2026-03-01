@@ -114,4 +114,36 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
       },
     );
   }
+
+  if (ctx.hasPermission('catalog:create')) {
+    server.tool(
+      'create-menu-item',
+      'Create a new menu item in a category',
+      {
+        name: z.string().describe('Item name'),
+        price: z.number().min(0).describe('Item price'),
+        categoryId: z.string().describe('Category ID to add the item to'),
+        description: z.string().optional().describe('Item description'),
+        isAvailable: z.boolean().optional().describe('Whether the item is available'),
+        isVegetarian: z.boolean().optional().describe('Whether the item is vegetarian'),
+        isVegan: z.boolean().optional().describe('Whether the item is vegan'),
+        isGlutenFree: z.boolean().optional().describe('Whether the item is gluten-free'),
+        preparationTime: z
+          .number()
+          .optional()
+          .describe('Preparation time in minutes'),
+      },
+      async (params) => {
+        const result = await ctx.menuService.createItem(
+          ctx.businessId,
+          params,
+          ctx.userId,
+        );
+        await ctx.audit('menu.create_item', 'menu', result.id);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
+  }
 }
