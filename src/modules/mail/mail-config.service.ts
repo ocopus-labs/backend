@@ -21,7 +21,7 @@ export class MailConfigService {
   }
 
   get appUrl(): string {
-    return this.configService.get<string>('APP_URL', 'http://localhost:5173');
+    return this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
   }
 
   get appName(): string {

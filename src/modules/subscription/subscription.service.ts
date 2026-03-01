@@ -25,7 +25,7 @@ export class SubscriptionService {
     private configService: ConfigService,
   ) {
     this.appUrl =
-      this.configService.get<string>('APP_URL') || 'http://localhost:5173';
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
   }
 
   /**
