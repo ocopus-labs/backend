@@ -6,8 +6,8 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci
-RUN npx prisma generate
+RUN npm ci --ignore-scripts
+RUN npx prisma generate --generator client
 
 # Stage 2: Build application and prune to production deps
 FROM node:20-alpine AS builder
