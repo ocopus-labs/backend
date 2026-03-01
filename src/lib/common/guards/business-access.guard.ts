@@ -40,7 +40,7 @@ export class BusinessAccessGuard implements CanActivate {
       return this.checkRolesAndPermissions(context, request);
     }
 
-    // 2. Check cross-request cache (60s TTL)
+    // 2. Check cross-request cache (5 min TTL)
     const cacheKey = `biz-access:${user.id}:${businessId}`;
     const cached = await this.cacheManager.get<{
       role: string;
@@ -105,8 +105,8 @@ export class BusinessAccessGuard implements CanActivate {
       };
     }
 
-    // 4. Cache result for 60s
-    await this.cacheManager.set(cacheKey, request.businessUser, 60_000);
+    // 4. Cache result for 5 minutes
+    await this.cacheManager.set(cacheKey, request.businessUser, 300_000);
 
     return this.checkRolesAndPermissions(context, request);
   }
