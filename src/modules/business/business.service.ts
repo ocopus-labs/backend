@@ -342,6 +342,88 @@ export class BusinessService {
     this.logger.log(`Business ${id} deleted by user ${userId}`);
   }
 
+  /**
+   * Get a business by ID along with the user's role in one query.
+   * Returns null if business not found or user has no access.
+   */
+  async findByIdWithAccess(
+    userId: string,
+    businessId: string,
+  ): Promise<{ business: Business; role: string } | null> {
+    const business = await this.prisma.restaurant.findUnique({
+      where: { id: businessId },
+      include: {
+        businessUsers: {
+          where: { userId, status: 'active' },
+          select: { role: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!business) return null;
+
+    if (business.businessUsers.length > 0) {
+      const { businessUsers, ...bizData } = business;
+      return { business: bizData, role: businessUsers[0].role };
+    }
+
+    // Franchise fallback
+    if (business.franchiseId) {
+      const franchiseUser = await this.prisma.franchiseUser.findFirst({
+        where: { userId, franchiseId: business.franchiseId, status: 'active' },
+        select: { role: true },
+      });
+      if (franchiseUser) {
+        const { businessUsers, ...bizData } = business;
+        return { business: bizData, role: franchiseUser.role };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get a business by slug along with the user's role in one query.
+   * Returns null if business not found or user has no access.
+   */
+  async findBySlugWithAccess(
+    userId: string,
+    slug: string,
+  ): Promise<{ business: Business; role: string } | null> {
+    const business = await this.prisma.restaurant.findUnique({
+      where: { slug },
+      include: {
+        businessUsers: {
+          where: { userId, status: 'active' },
+          select: { role: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!business) return null;
+
+    if (business.businessUsers.length > 0) {
+      const { businessUsers, ...bizData } = business;
+      return { business: bizData, role: businessUsers[0].role };
+    }
+
+    // Franchise fallback
+    if (business.franchiseId) {
+      const franchiseUser = await this.prisma.franchiseUser.findFirst({
+        where: { userId, franchiseId: business.franchiseId, status: 'active' },
+        select: { role: true },
+      });
+      if (franchiseUser) {
+        const { businessUsers, ...bizData } = business;
+        return { business: bizData, role: franchiseUser.role };
+      }
+    }
+
+    return null;
+  }
+
   async checkUserAccess(userId: string, businessId: string): Promise<boolean> {
     const businessUser = await this.prisma.businessUser.findFirst({
       where: {

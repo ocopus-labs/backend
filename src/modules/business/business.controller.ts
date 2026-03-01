@@ -90,20 +90,17 @@ export class BusinessController {
    */
   @Get(':id')
   async getById(@Param('id') id: string, @Session() session: UserSession) {
-    const hasAccess = await this.businessService.checkUserAccess(
+    const result = await this.businessService.findByIdWithAccess(
       session.user.id,
       id,
     );
-    if (!hasAccess) {
+    if (!result) {
       throw new ForbiddenException('You do not have access to this business');
     }
 
-    const business = await this.businessService.findByIdOrFail(id);
-    const role = await this.businessService.getUserRole(session.user.id, id);
-
     return {
-      business,
-      userRole: role,
+      business: result.business,
+      userRole: result.role,
     };
   }
 
@@ -115,27 +112,17 @@ export class BusinessController {
     @Param('slug') slug: string,
     @Session() session: UserSession,
   ) {
-    const business = await this.businessService.findBySlug(slug);
-    if (!business) {
-      throw new ForbiddenException('Business not found');
-    }
-
-    const hasAccess = await this.businessService.checkUserAccess(
+    const result = await this.businessService.findBySlugWithAccess(
       session.user.id,
-      business.id,
+      slug,
     );
-    if (!hasAccess) {
-      throw new ForbiddenException('You do not have access to this business');
+    if (!result) {
+      throw new ForbiddenException('Business not found or you do not have access');
     }
-
-    const role = await this.businessService.getUserRole(
-      session.user.id,
-      business.id,
-    );
 
     return {
-      business,
-      userRole: role,
+      business: result.business,
+      userRole: result.role,
     };
   }
 
@@ -242,16 +229,15 @@ export class BusinessController {
     businessId: string,
     allowedRoles: string[],
   ): Promise<void> {
-    const hasAccess = await this.businessService.checkUserAccess(
+    const result = await this.businessService.findByIdWithAccess(
       userId,
       businessId,
     );
-    if (!hasAccess) {
+    if (!result) {
       throw new ForbiddenException('You do not have access to this business');
     }
 
-    const role = await this.businessService.getUserRole(userId, businessId);
-    if (!role || !allowedRoles.includes(role)) {
+    if (!allowedRoles.includes(result.role)) {
       throw new ForbiddenException(
         'You do not have permission to perform this action',
       );

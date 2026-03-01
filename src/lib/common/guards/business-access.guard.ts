@@ -38,6 +38,7 @@ export class BusinessAccessGuard implements CanActivate {
         restaurantId: businessId,
         status: 'active',
       },
+      select: { role: true, permissions: true },
     });
 
     if (!businessUser) {

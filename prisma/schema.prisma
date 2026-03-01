@@ -110,6 +110,7 @@ model BusinessUser {
   @@index([userId])
   @@index([role])
   @@index([status])
+  @@index([userId, restaurantId, status])
   @@map("business_users")
 }
 
@@ -339,6 +340,7 @@ model Payment {
   @@index([status])
   @@index([method])
   @@index([deletedAt])
+  @@index([restaurantId, status])
   @@map("payments")
 }
 
