@@ -42,11 +42,16 @@ export class BusinessService {
     // Upload logo to Cloudinary if it's base64 data
     let logoUrl = dto.logo;
     if (logoUrl?.startsWith('data:')) {
-      const uploadResult = await this.cloudinaryService.uploadImage(
-        logoUrl,
-        'business-logos',
-      );
-      logoUrl = uploadResult.url;
+      try {
+        const uploadResult = await this.cloudinaryService.uploadImage(
+          logoUrl,
+          'business-logos',
+        );
+        logoUrl = uploadResult.url;
+      } catch (error) {
+        this.logger.warn(`Logo upload failed during business creation, skipping logo: ${error}`);
+        logoUrl = undefined;
+      }
     }
 
     const business = await this.prisma.$transaction(async (tx) => {
@@ -225,11 +230,15 @@ export class BusinessService {
     if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.logo) {
       if (dto.logo.startsWith('data:')) {
-        const uploadResult = await this.cloudinaryService.uploadImage(
-          dto.logo,
-          'business-logos',
-        );
-        updateData.logo = uploadResult.url;
+        try {
+          const uploadResult = await this.cloudinaryService.uploadImage(
+            dto.logo,
+            'business-logos',
+          );
+          updateData.logo = uploadResult.url;
+        } catch (error) {
+          this.logger.warn(`Logo upload failed during business update, skipping: ${error}`);
+        }
       } else {
         updateData.logo = dto.logo;
       }
