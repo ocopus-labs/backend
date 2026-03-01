@@ -1,56 +1,47 @@
-# ─── Stage 1: Install ALL deps + generate Prisma client ───────────────────────
-FROM node:20-alpine AS deps
-
-WORKDIR /usr/src/app
+# ─── Build stage ─────────────────────────────────────────────────────────────
+FROM node:20-alpine AS build
+WORKDIR /app
 
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci --ignore-scripts && \
+# --include=dev: Coolify sets NODE_ENV=production at build time via secrets,
+# which makes npm skip devDependencies. This flag overrides that.
+RUN npm ci --include=dev --ignore-scripts && \
     npx prisma generate --generator client
 
-# ─── Stage 2: Build ───────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
-
-WORKDIR /usr/src/app
-
-COPY --from=deps /usr/src/app/node_modules ./node_modules
-COPY --from=deps /usr/src/app/package*.json ./
-COPY --from=deps /usr/src/app/prisma ./prisma/
 COPY tsconfig*.json nest-cli.json prisma.config.ts ./
 COPY src ./src/
 
-RUN npx nest build && \
-    npm prune --omit=dev --ignore-scripts
+RUN npx nest build
 
-# ─── Stage 3: Production runtime ──────────────────────────────────────────────
-FROM node:20-alpine AS runtime
+# ─── Production stage ────────────────────────────────────────────────────────
+FROM node:20-alpine
+WORKDIR /app
 
-WORKDIR /usr/src/app
+ENV NODE_ENV=production
 
-ENV NODE_ENV=production \
-    NPM_CONFIG_UPDATE_NOTIFIER=false
+COPY package*.json ./
+# Install production deps + prisma CLI (needed for migrations at startup).
+# prisma is a devDep so npm ci --omit=dev skips it; install it separately.
+RUN npm ci --omit=dev --ignore-scripts && \
+    npm install prisma --no-save
 
-# Prisma needs the query engine binary — copy only what's needed
-COPY --from=builder --chown=node:node /usr/src/app/dist          ./dist
-COPY --from=builder --chown=node:node /usr/src/app/node_modules  ./node_modules
-COPY --from=builder --chown=node:node /usr/src/app/package*.json ./
-COPY --from=deps    --chown=node:node /usr/src/app/prisma        ./prisma/
-COPY --chown=node:node prisma.config.ts ./
+# Generated Prisma query-engine client from build stage
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 
-# Prisma CLI is needed for migrations at startup but is a devDependency
-# removed by prune. Re-install it (also downloads platform engine binaries).
-RUN npm install prisma --no-save
+# Compiled application
+COPY --from=build /app/dist ./dist
 
-COPY --chown=node:node entrypoint.sh ./
+# Prisma schema, migrations, and config for runtime migrate deploy
+COPY prisma ./prisma/
+COPY prisma.config.ts entrypoint.sh ./
 
-RUN chmod +x entrypoint.sh
+RUN chmod +x entrypoint.sh && chown -R node:node /app
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/api || exit 1
 
 EXPOSE 3000
-
 USER node
-
 ENTRYPOINT ["./entrypoint.sh"]
