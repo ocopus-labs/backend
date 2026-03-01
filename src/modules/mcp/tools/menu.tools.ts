@@ -124,6 +124,7 @@ export function registerMenuTools(server: McpServer, ctx: McpContext) {
         price: z.number().min(0).describe('Item price'),
         categoryId: z.string().describe('Category ID to add the item to'),
         description: z.string().optional().describe('Item description'),
+        image: z.string().url().optional().describe('Image URL for the item'),
         isAvailable: z.boolean().optional().describe('Whether the item is available'),
         isVegetarian: z.boolean().optional().describe('Whether the item is vegetarian'),
         isVegan: z.boolean().optional().describe('Whether the item is vegan'),
