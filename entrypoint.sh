@@ -1,18 +1,18 @@
 #!/bin/sh
 set -e
 
-# Wait for database to be ready (important for Coolify where there's no depends_on)
 echo "Waiting for database..."
 MAX_RETRIES=30
 RETRY_COUNT=0
-until npx prisma migrate deploy 2>/dev/null; do
+
+until npx prisma migrate deploy 2>&1; do
   RETRY_COUNT=$((RETRY_COUNT + 1))
   if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; then
-    echo "ERROR: Database not reachable after ${MAX_RETRIES} attempts. Exiting."
+    echo "ERROR: Could not run migrations after ${MAX_RETRIES} attempts. Exiting."
     exit 1
   fi
-  echo "Database not ready yet (attempt ${RETRY_COUNT}/${MAX_RETRIES}). Retrying in 2s..."
-  sleep 2
+  echo "--- Attempt ${RETRY_COUNT}/${MAX_RETRIES} failed. Retrying in 3s..."
+  sleep 3
 done
 echo "Migrations applied successfully."
 

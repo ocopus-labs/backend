@@ -39,7 +39,7 @@ COPY prisma.config.ts entrypoint.sh ./
 
 RUN chmod +x entrypoint.sh && chown -R node:node /app
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
   CMD wget -qO- http://localhost:3000/api || exit 1
 
 EXPOSE 3000
