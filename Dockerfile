@@ -22,6 +22,7 @@ COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY src ./src/
 
+RUN npm rebuild
 RUN npm run build
 RUN npm prune --production
 
