@@ -165,6 +165,14 @@ export const createAuthConfig = (
         enabled: !!process.env.COOKIE_DOMAIN,
         domain: process.env.COOKIE_DOMAIN,
       },
+      cookies: {
+        session_token: {
+          attributes: {
+            sameSite: 'none' as const,
+            secure: true,
+          },
+        },
+      },
     },
 
     // Session configuration
