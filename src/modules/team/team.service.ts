@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { UsageTrackingService } from 'src/modules/subscription/usage-tracking.service';
+import { MailService } from 'src/modules/mail/mail.service';
 import {
   InviteTeamMemberDto,
   AddExistingUserDto,
@@ -42,6 +43,7 @@ export class TeamService {
   constructor(
     private prisma: PrismaService,
     private usageTrackingService: UsageTrackingService,
+    private mailService: MailService,
   ) {}
 
   /**
@@ -320,6 +322,21 @@ export class TeamService {
       );
     }
 
+    // Fetch business name and inviter info for emails
+    const [business, inviter] = await Promise.all([
+      this.prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { name: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: inviterId },
+        select: { name: true },
+      }),
+    ]);
+    const businessName = business?.name || 'the business';
+    const inviterName = inviter?.name || 'A team administrator';
+    const roleName = getRoleDisplayName(dto.role as UserRole) || dto.role;
+
     // Check if user with email already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -347,23 +364,30 @@ export class TeamService {
         context,
       );
 
+      // Send notification email to existing user
+      try {
+        await this.mailService.sendNotification(dto.email, {
+          userName: existingUser.name || dto.email,
+          title: `You've been added to ${businessName}`,
+          message: `${inviterName} has added you as a ${roleName} to ${businessName}. You can now access the business dashboard.${dto.message ? `\n\nMessage: "${dto.message}"` : ''}`,
+          actionUrl: '/dashboard/businesses',
+          actionText: 'Go to Dashboard',
+          type: 'success',
+        });
+      } catch (emailError) {
+        this.logger.warn(`Failed to send team addition email to ${dto.email}: ${emailError}`);
+      }
+
       return {
         invitation: {
           email: dto.email,
           role: dto.role,
-          status: 'added', // User existed and was added directly
+          status: 'added',
         },
       };
     }
 
-    // For new users, we would typically:
-    // 1. Create an invitation record
-    // 2. Send an invitation email
-    // 3. When user signs up with that email, automatically add them to the team
-    //
-    // For now, we'll just log the invitation request
-    // In production, this would integrate with the mail service
-
+    // For new users: send invitation email to sign up
     await this.createAuditLog(
       restaurantId,
       inviterId,
@@ -376,6 +400,19 @@ export class TeamService {
       },
       context,
     );
+
+    try {
+      await this.mailService.sendNotification(dto.email, {
+        userName: dto.email,
+        title: `You're invited to join ${businessName}`,
+        message: `${inviterName} has invited you to join ${businessName} as a ${roleName}. Create an account with this email address to get started.${dto.message ? `\n\nMessage: "${dto.message}"` : ''}`,
+        actionUrl: `/register?email=${encodeURIComponent(dto.email)}`,
+        actionText: 'Create Account',
+        type: 'info',
+      });
+    } catch (emailError) {
+      this.logger.warn(`Failed to send invitation email to ${dto.email}: ${emailError}`);
+    }
 
     this.logger.log(`Invitation sent to ${dto.email} for role ${dto.role}`);
 
