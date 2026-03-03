@@ -69,8 +69,27 @@ export const createAuthConfig = (
       },
     },
 
-    // Enable hooks support for NestJS integration
-    hooks: {},
+    // Send welcome email when a new user is created
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (user) => {
+            try {
+              const frontendUrl =
+                process.env.FRONTEND_URL || 'http://localhost:5173';
+              await mailService.sendWelcomeEmail(user.email, {
+                userName: user.name || user.email.split('@')[0],
+                dashboardUrl: `${frontendUrl}/dashboard`,
+              });
+            } catch (error) {
+              logger.error(
+                `Failed to send welcome email to ${user.email}: ${error instanceof Error ? error.message : error}`,
+              );
+            }
+          },
+        },
+      },
+    },
 
     plugins: [
       openAPI(),
