@@ -1,9 +1,11 @@
 import {
   Injectable,
+  Inject,
   Logger,
   NotFoundException,
   BadRequestException,
   ConflictException,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import {
@@ -20,12 +22,17 @@ import {
   TableSession,
   TableMaintenanceLog,
 } from './interfaces';
+import { ReservationService } from 'src/modules/reservation/reservation.service';
 
 @Injectable()
 export class TableService {
   private readonly logger = new Logger(TableService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => ReservationService))
+    private reservationService: ReservationService,
+  ) {}
 
   async create(
     restaurantId: string,
@@ -86,10 +93,19 @@ export class TableService {
     return table;
   }
 
-  async findAll(restaurantId: string): Promise<Table[]> {
+  async findAll(restaurantId: string) {
     return this.prisma.table.findMany({
       where: { restaurantId },
       orderBy: { tableNumber: 'asc' },
+      include: {
+        reservations: {
+          where: {
+            reservationDate: new Date().toISOString().split('T')[0],
+            status: { in: ['pending', 'confirmed', 'seated'] },
+          },
+          orderBy: { reservationTime: 'asc' },
+        },
+      },
     });
   }
 
@@ -247,6 +263,17 @@ export class TableService {
       throw new BadRequestException('Table is under maintenance');
     }
 
+    // If table is reserved, auto-seat the active reservation
+    if (table.status === TABLE_STATUSES.RESERVED) {
+      try {
+        await this.reservationService.seatActiveReservation(id, restaurantId);
+      } catch (err) {
+        this.logger.warn(
+          `Failed to auto-seat reservation for table ${table.tableNumber}: ${err}`,
+        );
+      }
+    }
+
     const session = {
       orderId: dto.orderId,
       orderNumber: dto.orderNumber,
@@ -300,10 +327,25 @@ export class TableService {
       unknown
     > | null;
 
+    // Check if there are more active reservations today — if so, revert to 'reserved'
+    const today = new Date().toISOString().split('T')[0];
+    const activeReservations = await this.prisma.reservation.count({
+      where: {
+        tableId: id,
+        reservationDate: today,
+        status: { in: ['pending', 'confirmed'] },
+      },
+    });
+
+    const newStatus =
+      activeReservations > 0
+        ? TABLE_STATUSES.RESERVED
+        : TABLE_STATUSES.AVAILABLE;
+
     const updatedTable = await this.prisma.table.update({
       where: { id },
       data: {
-        status: TABLE_STATUSES.AVAILABLE,
+        status: newStatus,
         currentSession: null,
       },
     });
@@ -317,7 +359,9 @@ export class TableService {
       { previousSession: currentSession },
     );
 
-    this.logger.log(`Session ended on table ${table.tableNumber}`);
+    this.logger.log(
+      `Session ended on table ${table.tableNumber}, status set to ${newStatus}`,
+    );
 
     return updatedTable;
   }
