@@ -44,6 +44,7 @@ model Restaurant {
   franchise         Franchise?         @relation("FranchiseBusinesses", fields: [franchiseId], references: [id])
   refunds           Refund[]
   stockTransactions StockTransaction[]
+  reservations      Reservation[]
   tables            Table[]
   usageRecords      UsageRecord[]
   apiKeys           ApiKey[]
@@ -379,18 +380,54 @@ model Table {
   status         String     @default("available") @map("status")
   qrCode         Json?      @map("qr_code")
   currentSession Json?      @map("current_session")
-  reservations   Json[]     @default([])
   settings       Json
   maintenanceLog Json[]     @default([]) @map("maintenance_log")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
   orders         Order[]
+  reservations   Reservation[]
   restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@unique([restaurantId, tableNumber])
   @@index([restaurantId])
   @@index([status])
   @@map("tables")
+}
+
+model Reservation {
+  id                 String     @id @default(uuid())
+  restaurantId       String     @map("restaurant_id")
+  tableId            String?    @map("table_id")
+  customerName       String     @map("customer_name")
+  customerPhone      String?    @map("customer_phone")
+  customerEmail      String?    @map("customer_email")
+  partySize          Int        @map("party_size")
+  reservationDate    String     @map("reservation_date")
+  reservationTime    String     @map("reservation_time")
+  duration           Int?
+  status             String     @default("pending") // pending, confirmed, seated, completed, cancelled, no_show
+  notes              String?    @db.Text
+  specialRequests    String?    @map("special_requests") @db.Text
+  source             String?    @default("manual") // manual, online, phone
+  createdBy          String?    @map("created_by")
+  confirmedAt        DateTime?  @map("confirmed_at")
+  seatedAt           DateTime?  @map("seated_at")
+  completedAt        DateTime?  @map("completed_at")
+  cancelledAt        DateTime?  @map("cancelled_at")
+  cancellationReason String?    @map("cancellation_reason") @db.Text
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      Table?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, reservationDate])
+  @@index([restaurantId, status])
+  @@index([restaurantId, reservationDate, status])
+  @@index([tableId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("reservations")
 }
 
 model AnalyticsDaily {

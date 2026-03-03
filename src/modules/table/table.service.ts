@@ -64,7 +64,6 @@ export class TableService {
               isReservable: true,
               defaultTurnoverTime: 60,
             },
-        reservations: [],
         maintenanceLog: [],
       },
     });

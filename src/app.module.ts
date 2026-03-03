@@ -34,6 +34,7 @@ import { TaxModule } from './modules/tax';
 import { QrModule } from './modules/qr';
 import { CustomerOrderModule } from './modules/customer-order';
 import { FranchiseModule } from './modules/franchise';
+import { ReservationModule } from './modules/reservation';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { FranchiseModule } from './modules/franchise';
     QrModule,
     CustomerOrderModule,
     FranchiseModule,
+    ReservationModule,
   ],
   controllers: [AppController],
   providers: [
