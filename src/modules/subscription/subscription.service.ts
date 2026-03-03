@@ -45,6 +45,28 @@ export class SubscriptionService {
   }
 
   /**
+   * Get the subscription for a business by finding the owner's subscription
+   */
+  async getBusinessSubscription(
+    businessId: string,
+  ): Promise<(Subscription & { plan: SubscriptionPlan }) | null> {
+    // Find the business owner
+    const owner = await this.prisma.businessUser.findFirst({
+      where: {
+        restaurantId: businessId,
+        role: 'restaurant_owner',
+      },
+      select: { userId: true },
+    });
+
+    if (!owner) {
+      return null;
+    }
+
+    return this.getActiveSubscription(owner.userId);
+  }
+
+  /**
    * Get subscription by Dodo subscription ID
    */
   async getByDodoSubscriptionId(dodoSubscriptionId: string) {

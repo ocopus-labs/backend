@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Param,
   HttpCode,
   HttpStatus,
   Logger,
@@ -77,6 +78,43 @@ export class SubscriptionController {
         currentPeriodEnd: subscription.currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
         hasBillingAccount: !!subscription.dodoCustomerId,
+      },
+    };
+  }
+
+  /**
+   * Get subscription for a business (returns the owner's subscription)
+   * Any team member can check what features the business has access to
+   */
+  @Get('business/:businessId')
+  @HttpCacheTTL(60)
+  async getBusinessSubscription(@Param('businessId') businessId: string) {
+    const subscription =
+      await this.subscriptionService.getBusinessSubscription(businessId);
+
+    if (!subscription) {
+      return { subscription: null };
+    }
+
+    return {
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        plan: {
+          id: subscription.plan.id,
+          name: subscription.plan.name,
+          slug: subscription.plan.slug,
+          displayName: subscription.plan.displayName,
+          priceMonthly: subscription.plan.priceMonthly,
+          features: subscription.plan.features,
+          maxLocations: subscription.plan.maxLocations,
+          maxTeamMembers: subscription.plan.maxTeamMembers,
+          maxOrdersPerMonth: subscription.plan.maxOrdersPerMonth,
+          sortOrder: subscription.plan.sortOrder,
+        },
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
       },
     };
   }
