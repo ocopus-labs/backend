@@ -782,6 +782,72 @@ export class OrderService {
     return { message: 'Item status updated', order };
   }
 
+  async bulkUpdateItemStatuses(
+    businessId: string,
+    orderId: string,
+    staffId: string,
+    itemIds: string[],
+    status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled',
+  ) {
+    const existing = await this.prisma.order.findFirst({
+      where: { id: orderId, restaurantId: businessId, deletedAt: null },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status !== 'active') {
+      throw new BadRequestException('Cannot modify a non-active order');
+    }
+
+    const items = existing.items as unknown as OrderItem[];
+    const auditTrail = existing.auditTrail as unknown as OrderAuditEntry[];
+    const now = new Date().toISOString();
+    const updatedItemIds: string[] = [];
+
+    for (const itemId of itemIds) {
+      const itemIndex = items.findIndex((i) => i.id === itemId);
+      if (itemIndex === -1) continue;
+
+      const oldStatus = items[itemIndex].status;
+      items[itemIndex].status = status;
+      updatedItemIds.push(itemId);
+
+      auditTrail.push({
+        action: 'order.item_status_updated',
+        performedBy: staffId,
+        performedAt: now,
+        details: { itemId, oldStatus, newStatus: status },
+      });
+    }
+
+    if (updatedItemIds.length === 0) {
+      throw new NotFoundException('No matching items found in order');
+    }
+
+    const order = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        items: items as unknown as object[],
+        auditTrail: auditTrail as unknown as object[],
+      },
+      include: {
+        table: true,
+      },
+    });
+
+    // Emit a single WebSocket event for the bulk update
+    this.orderGateway.emitItemStatusChanged(businessId, {
+      orderId,
+      itemId: updatedItemIds.join(','),
+      status,
+      order,
+    });
+
+    return { message: `${updatedItemIds.length} item(s) status updated`, order };
+  }
+
   async removeItemFromOrder(
     businessId: string,
     orderId: string,
@@ -946,12 +1012,43 @@ export class OrderService {
     return { orders };
   }
 
-  async getOrderStats(businessId: string, date?: Date) {
-    const startOfDay = date
-      ? new Date(new Date(date).setHours(0, 0, 0, 0))
-      : new Date(new Date().setHours(0, 0, 0, 0));
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setDate(endOfDay.getDate() + 1);
+  async getOrderStats(businessId: string, date?: Date, period?: string) {
+    let startOfDay: Date;
+    let endOfDay: Date;
+
+    if (period && !date) {
+      const now = new Date();
+      endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      switch (period) {
+        case 'yesterday':
+          startOfDay.setDate(startOfDay.getDate() - 1);
+          endOfDay.setDate(endOfDay.getDate() - 1);
+          break;
+        case 'week':
+          startOfDay.setDate(startOfDay.getDate() - 7);
+          break;
+        case 'month':
+          startOfDay.setMonth(startOfDay.getMonth() - 1);
+          break;
+        case 'quarter':
+          startOfDay.setMonth(startOfDay.getMonth() - 3);
+          break;
+        case 'year':
+          startOfDay.setFullYear(startOfDay.getFullYear() - 1);
+          break;
+        // 'today' or default: keep as-is (today only)
+      }
+    } else {
+      startOfDay = date
+        ? new Date(new Date(date).setHours(0, 0, 0, 0))
+        : new Date(new Date().setHours(0, 0, 0, 0));
+      endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+    }
 
     const result = await this.prisma.$queryRaw<
       [{ total: bigint; completed_paid: bigint; completed: bigint; cancelled: bigint; active: bigint; total_revenue: Prisma.Decimal }]

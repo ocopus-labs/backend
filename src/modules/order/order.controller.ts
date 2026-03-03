@@ -101,10 +101,12 @@ export class OrderController {
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
     @Query('date') date?: string,
+    @Query('period') period?: string,
   ) {
     return this.orderService.getOrderStats(
       businessId,
       date ? new Date(date) : undefined,
+      period,
     );
   }
 
@@ -297,6 +299,31 @@ export class OrderController {
       orderId,
       session.user.id,
       dto,
+    );
+  }
+
+  @Patch(':orderId/items/bulk-status')
+  @BusinessRoles(
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.FRANCHISE_OWNER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.MANAGER,
+    USER_ROLES.STAFF,
+  )
+  async bulkUpdateItemStatuses(
+    @Param('businessId') businessId: string,
+    @Param('orderId') orderId: string,
+    @Body('itemIds') itemIds: string[],
+    @Body('status')
+    status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled',
+    @Session() session: UserSession,
+  ) {
+    return this.orderService.bulkUpdateItemStatuses(
+      businessId,
+      orderId,
+      session.user.id,
+      itemIds,
+      status,
     );
   }
 

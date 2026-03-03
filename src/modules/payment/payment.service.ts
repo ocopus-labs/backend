@@ -632,12 +632,44 @@ export class PaymentService {
   async getPaymentSummary(
     businessId: string,
     date?: Date,
+    period?: string,
   ): Promise<{ summary: PaymentSummary }> {
-    const startOfDay = date
-      ? new Date(new Date(date).setHours(0, 0, 0, 0))
-      : new Date(new Date().setHours(0, 0, 0, 0));
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setDate(endOfDay.getDate() + 1);
+    let startOfDay: Date;
+    let endOfDay: Date;
+
+    if (period && !date) {
+      const now = new Date();
+      endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      switch (period) {
+        case 'yesterday':
+          startOfDay.setDate(startOfDay.getDate() - 1);
+          endOfDay.setDate(endOfDay.getDate() - 1);
+          break;
+        case 'week':
+          startOfDay.setDate(startOfDay.getDate() - 7);
+          break;
+        case 'month':
+          startOfDay.setMonth(startOfDay.getMonth() - 1);
+          break;
+        case 'quarter':
+          startOfDay.setMonth(startOfDay.getMonth() - 3);
+          break;
+        case 'year':
+          startOfDay.setFullYear(startOfDay.getFullYear() - 1);
+          break;
+        // 'today' or default: keep as-is (today only)
+      }
+    } else {
+      startOfDay = date
+        ? new Date(new Date(date).setHours(0, 0, 0, 0))
+        : new Date(new Date().setHours(0, 0, 0, 0));
+      endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+    }
 
     const payments = await this.prisma.payment.findMany({
       where: {

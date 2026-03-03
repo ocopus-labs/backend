@@ -169,10 +169,12 @@ export class PaymentController {
     @Param('businessId') businessId: string,
     @Session() session: UserSession,
     @Query('date') date?: string,
+    @Query('period') period?: string,
   ) {
     return this.paymentService.getPaymentSummary(
       businessId,
       date ? new Date(date) : undefined,
+      period,
     );
   }
 
